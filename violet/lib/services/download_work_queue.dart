@@ -17,6 +17,18 @@ class DownloadWorkQueue extends ChangeNotifier {
   int get totalCount => _submitted.length;
   bool contains(int id) => _submitted.containsKey(id);
 
+  bool cancelPending(int id) {
+    for (final entry in _pending) {
+      if (entry.$1 != id) continue;
+      _pending.remove(entry);
+      _submitted.remove(id);
+      entry.$3.complete();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
   Future<void> submit(int id, Future<void> Function() work) {
     final existing = _submitted[id];
     if (existing != null) return existing;

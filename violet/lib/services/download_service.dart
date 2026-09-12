@@ -118,7 +118,7 @@ class DownloadService {
     try {
       await job.item.update();
       await routine.selectExtractor();
-      await routine.createTasks(progressCallback: (current, total) {
+      await routine.createTasks(progressCallback: (current, total) async {
         job.extracted = current;
         job.total = total;
       });
@@ -178,6 +178,7 @@ class DownloadService {
     final job = _jobs[item.id()];
     if (job != null && queue.contains(item.id())) {
       job.cancelled = true;
+      queue.cancelPending(item.id());
       final taskIds = job.routine?.submittedTaskIds;
       if (taskIds != null) {
         final downloader = await IsolateDownloader.getInstance();

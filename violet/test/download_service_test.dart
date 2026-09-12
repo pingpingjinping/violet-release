@@ -86,6 +86,28 @@ void main() {
     queue.dispose();
   });
 
+  test('Removing pending work completes immediately without waiting for the active gallery', () async {
+    final first = Completer<void>();
+    final started = Completer<void>();
+    var removedRan = false;
+    final queue = DownloadWorkQueue(keepAwake: (_) async {});
+    final active = queue.submit(1, () async {
+      started.complete();
+      await first.future;
+    });
+    final pending = queue.submit(2, () async { removedRan = true; });
+    await started.future;
+    expect(queue.cancelPending(2), true);
+    await pending;
+    expect(removedRan, false);
+    expect(queue.contains(2), false);
+    expect(queue.activeId, 1);
+    first.complete();
+    await active;
+    await Future<void>.delayed(Duration.zero);
+    queue.dispose();
+  });
+
   test('Real downloader cancels queued files and retry byte counts start from zero', () async {
     final root = await Directory.systemTemp.createTemp('violet-download-test-');
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
