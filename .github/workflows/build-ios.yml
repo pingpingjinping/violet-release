@@ -28,20 +28,31 @@ jobs:
           rustup default stable
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
-      - name: Install Flutter dependencies
+      - name: Prepare Flutter iOS build
         working-directory: violet
-        run: flutter pub get
+        run: |
+          flutter pub get
+          flutter build ios --config-only --release
 
-      - name: Build iOS App (No Codesign)
-        working-directory: violet
-        run: flutter build ios --release --no-codesign
+      - name: Build Xcode Workspace directly (No Codesign)
+        working-directory: violet/ios
+        run: |
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath ../build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
 
       - name: Package Payload to IPA
         working-directory: violet
         run: |
-          cd build/ios/iphoneos
+          APP_DIR=$(find build/DerivedData/Build/Products/Release-iphoneos -name "Runner.app" -type d | head -n 1)
           mkdir Payload
-          cp -r Runner.app Payload/
+          cp -r "$APP_DIR" Payload/
           zip -r violet.ipa Payload
           mv violet.ipa $GITHUB_WORKSPACE/
 
