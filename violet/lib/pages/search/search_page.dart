@@ -205,6 +205,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
 
     if (widget.searchKeyWord == null) {
       scrollView = CustomScrollView(
+        cacheExtent: MediaQuery.of(context).size.height * 1.5,
         controller: c.scrollController,
         physics: const BouncingScrollPhysics(),
         slivers: slivers,
@@ -239,6 +240,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
                   return [];
                 },
             body: CustomScrollView(
+              cacheExtent: MediaQuery.of(context).size.height * 1.5,
               controller: ModalScrollController.of(context),
               physics: const BouncingScrollPhysics(),
               slivers: slivers,

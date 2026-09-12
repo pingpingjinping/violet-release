@@ -21,7 +21,6 @@ import 'package:violet/pages/bookmark/bookmark_page.dart';
 import 'package:violet/pages/common/toast.dart';
 import 'package:violet/pages/common/utils.dart';
 import 'package:violet/pages/download/download_page.dart';
-import 'package:violet/pages/hot/hot_page.dart';
 import 'package:violet/pages/lock/lock_screen.dart';
 import 'package:violet/pages/search/search_page.dart';
 import 'package:violet/pages/segment/double_tap_to_top.dart';
@@ -365,16 +364,15 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   bool _isDoubleTap = false;
 
   late final List<GlobalKey<State>> _widgetKeys = List.generate(
-    5,
+    4,
     (index) => GlobalKey(),
   );
 
   late final List<Widget> _tabs = [
     SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
-    HotPage(key: _widgetKeys[1]),
-    BookmarkPage(key: _widgetKeys[2]),
-    DownloadPage(key: _widgetKeys[3]),
-    SettingsPage(key: _widgetKeys[4]),
+    BookmarkPage(key: _widgetKeys[1]),
+    DownloadPage(key: _widgetKeys[2]),
+    SettingsPage(key: _widgetKeys[3]),
   ];
 
   Widget _buildBottomNavigationBar(BuildContext context) {
@@ -435,7 +433,6 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
         },
         items: <BottomNavigationBarItem>[
           buildItem(Icons.search, 'search'),
-          buildItem(MdiIcons.fire, 'hot'),
           buildItem(Icons.bookmark, 'bookmark'),
           buildItem(Icons.file_download, 'download'),
           buildItem(Icons.settings, 'settings'),
@@ -563,10 +560,9 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
               ),
             ),
             buildButton(Icons.search, 0, 'search'),
-            buildButton(MdiIcons.fire, 1, 'hot'),
-            buildButton(MdiIcons.bookmark, 2, 'bookmark'),
-            buildButton(MdiIcons.download, 3, 'download'),
-            buildButton(Icons.settings, 4, 'settings'),
+            buildButton(MdiIcons.bookmark, 1, 'bookmark'),
+            buildButton(MdiIcons.download, 2, 'download'),
+            buildButton(Icons.settings, 3, 'settings'),
             const Spacer(),
             Text(
               'Copyright (C) 2020-2024\nby project-violet',
@@ -626,6 +622,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
           if (event is KeyDownEvent) {
             switch (event.logicalKey) {
               case LogicalKeyboardKey.keyA:
+                if (_currentPage <= 0) break;
                 _pageController.animateToPage(
                   _currentPage - 1,
                   duration: const Duration(milliseconds: 250),
@@ -633,6 +630,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
                 );
                 break;
               case LogicalKeyboardKey.keyD:
+                if (_currentPage >= _tabs.length - 1) break;
                 _pageController.animateToPage(
                   _currentPage + 1,
                   duration: const Duration(milliseconds: 250),
