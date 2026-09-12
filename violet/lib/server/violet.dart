@@ -18,7 +18,8 @@ import 'package:violet/server/wsalt.dart' as wsalt;
 import 'package:violet/settings/settings.dart';
 
 class VioletServer {
-  static String get api => ServerConfig.endpoint(ServerConfig.apiBase(ServerConfig.webBase), 'api');
+  static String get api =>
+      ServerConfig.endpoint(ServerConfig.apiBase(ServerConfig.webBase), 'api');
 
   static Future<dynamic> top(int offset, int count, String type) async {
     final gg = await http.get(

@@ -58,7 +58,12 @@ class ContentDbSync {
         final fields = line.trim().split(RegExp(r'\s+'));
         if (fields.length < 3 || fields.first != 'db') continue;
         version = int.tryParse(fields[1]);
-        download = Uri.tryParse(ServerConfig.downloadUrl('${fields[2]}-korean.db', ServerConfig.webBase));
+        download = Uri.tryParse(
+          ServerConfig.downloadUrl(
+            '${fields[2]}-korean.db',
+            ServerConfig.webBase,
+          ),
+        );
         break;
       }
       if (version == null ||
@@ -66,10 +71,12 @@ class ContentDbSync {
           download == null ||
           !['http', 'https'].contains(download.scheme))
         return false;
-      if ((prefs.getString('content-snapshot-server') ?? ServerConfig.defaultUrl) == ServerConfig.webBase &&
+      if ((prefs.getString('content-snapshot-server') ??
+                  ServerConfig.defaultUrl) ==
+              ServerConfig.webBase &&
           (prefs.getInt('content-snapshot-version') ??
-              prefs.getInt('synclatest')) ==
-          version) {
+                  prefs.getInt('synclatest')) ==
+              version) {
         return false;
       }
       if (!canApply()) return false;

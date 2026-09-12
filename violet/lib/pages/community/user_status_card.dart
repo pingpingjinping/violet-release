@@ -235,8 +235,10 @@ class _UserStatusCardState extends ThemeSwitchableState<UserStatusCard>
                     ),
                   ),
                   onTap: () async {
-                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PiBackupPage()));
-          },
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PiBackupPage()),
+                    );
+                  },
                 ),
         ),
       ],

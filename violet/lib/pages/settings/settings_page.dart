@@ -108,13 +108,17 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
             leading: const Icon(Icons.dns_outlined),
             title: const Text('작품 서버 주소'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServerSettingsPage())),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.backup_outlined),
             title: const Text('Pi 전체 백업·복원'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
           ),
           ListTile(
             leading: const Icon(Icons.sync),
@@ -2056,7 +2060,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           title: Text(Translations.instance!.trans('restoringbookmark')),
           trailing: const Icon(Icons.keyboard_arrow_right),
           onTap: () async {
-            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PiBackupPage()));
+            await Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PiBackupPage()));
           },
         ),
         ListTile(

@@ -8,7 +8,7 @@ import 'package:violet/services/server_config.dart';
 
 Map<String, dynamic> payload([int count = 1]) => {
   'schema': 1, 'userAppId': 'test-user-app-id', 'tables': {
-    'BookmarkGroup': [{'Id': 1, 'Name': 'folder'}],
+    'BookmarkGroup': [<String, dynamic>{'Id': 1, 'Name': 'folder'}],
     'BookmarkArticle': [{'Id': 1, 'Article': '42', 'GroupId': 1}],
     'BookmarkArtist': [],
     'ArticleReadLog': List.generate(count, (i) => {'Id': i + 1, 'Article': '${i % 100}', 'DateTimeStart': '2026-09-12T00:00:00Z', 'LastPage': 5, 'Type': 0}),
@@ -17,6 +17,7 @@ Map<String, dynamic> payload([int count = 1]) => {
 
 void main() {
   test('LAN server URLs change together while public CDN URLs are preserved', () {
+    expect(ServerConfig.normalize('192.168.1.20'), 'http://192.168.1.20:3001');
     expect(ServerConfig.normalize('192.168.1.20:3001/'), 'http://192.168.1.20:3001');
     expect(ServerConfig.databaseBase('http://192.168.1.20:3001'), 'http://192.168.1.20:3002');
     expect(ServerConfig.downloadUrl('http://192.168.0.39:3002/rawdata-korean.db', 'http://192.168.1.20:3001'), 'http://192.168.1.20:3002/rawdata-korean.db');

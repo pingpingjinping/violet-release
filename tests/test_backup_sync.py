@@ -85,4 +85,30 @@ class BackupTests(unittest.TestCase):
         finally:
             server.shutdown(); server.server_close(); thread.join()
 
+    def test_real_server_routes_and_private_files_are_separate_from_export(self):
+        import functools
+        import importlib.util
+        import os
+        root = Path(self.temp.name)
+        with patch.dict(os.environ, {'VIOLET_EXPORT_ROOT': str(root / 'export'), 'VIOLET_SYNC_STATE': str(root / 'state')}):
+            spec = importlib.util.spec_from_file_location('backup_route_server', Path(__file__).resolve().parents[1] / 'mobile-db' / 'server.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        server = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(module.Handler, directory=str(module.ROOT)))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base = f'http://127.0.0.1:{server.server_port}'
+        try:
+            with urlopen(base + '/api/server-info', timeout=3) as response:
+                self.assertTrue(json.load(response)['features']['backups'])
+            with self.assertRaises(HTTPError) as error: urlopen(base + '/api/backups', timeout=3)
+            self.assertEqual(error.exception.code, 401)
+            request = Request(base + '/api/backups', headers={'X-Violet-Sync-Token': module.store.token})
+            with urlopen(request, timeout=3) as response:
+                self.assertEqual(json.load(response)['backups'], [])
+            with self.assertRaises(HTTPError) as error: urlopen(base + '/state/sync-token.txt', timeout=3)
+            self.assertEqual(error.exception.code, 404)
+        finally:
+            server.shutdown(); server.server_close(); thread.join()
+
 if __name__ == '__main__': unittest.main()

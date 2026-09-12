@@ -246,7 +246,10 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       await prefs.setString('databasetype', widget.dbType!);
       if (widget.dbType! != 'dummy') {
         await prefs.setString('content-snapshot-server', ServerConfig.webBase);
-        await prefs.setInt('content-snapshot-version', SyncManager.getLatestDB().timestamp);
+        await prefs.setInt(
+          'content-snapshot-version',
+          SyncManager.getLatestDB().timestamp,
+        );
       } else {
         await prefs.remove('content-snapshot-version');
       }
