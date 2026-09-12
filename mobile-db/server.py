@@ -69,6 +69,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        if self.path == '/rawdata':
+            self.path = '/rawdata-korean.db'
         if self.path == '/syncversion.txt':
             output = ROOT / 'rawdata-korean.db'
             if not output.exists():

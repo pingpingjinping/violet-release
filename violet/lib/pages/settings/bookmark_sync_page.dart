@@ -21,6 +21,7 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
     super.initState();
     _load();
   }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -31,12 +32,14 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
       _loaded = true;
     });
   }
+
   @override
   void dispose() {
     _token.dispose();
     _server.dispose();
     super.dispose();
   }
+
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('bookmark_sync_server', _server.text.trim());
@@ -44,36 +47,74 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
     await prefs.setInt('bookmark_sync_days', _days);
     if (mounted) setState(() => _message = '저장했습니다. 토큰을 비우면 동기화가 꺼집니다.');
   }
+
   Future<void> _sync() async {
     setState(() => _busy = true);
     try {
       await _save();
       final count = await BookmarkSync.sync(force: true);
-      if (mounted) setState(() => _message = count == null ? '토큰을 입력해 주세요.' : '동기화 완료: 중복을 제외한 작품 $count개');
+      if (mounted)
+        setState(
+          () => _message = count == null
+              ? '토큰을 입력해 주세요.'
+              : '동기화 완료: 중복을 제외한 작품 $count개',
+        );
     } catch (_) {
-      if (mounted) setState(() => _message = '동기화 실패. 토큰과 WalnutPi 네트워크 연결을 확인해 주세요. 기기의 북마크는 보존됩니다.');
+      if (mounted)
+        setState(
+          () => _message =
+              '동기화 실패. 토큰과 WalnutPi 네트워크 연결을 확인해 주세요. 기기의 북마크는 보존됩니다.',
+        );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('앱·웹 작품 북마크 동기화')),
-    body: ListView(padding: const EdgeInsets.all(20), children: [
-      const Text('선택한 주기가 지난 뒤 앱을 열면 작품 북마크를 동기화합니다. 폴더·작가 북마크·읽은 기록·다운로드는 기기별로 유지됩니다. 새로 받은 북마크는 미분류 폴더에 들어갑니다.'),
-      const SizedBox(height: 16),
-      TextField(controller: _server, enabled: _loaded && !_busy,
-        decoration: const InputDecoration(labelText: '서버 주소 (http://서버IP:3002)')),
-      TextField(controller: _token, obscureText: true, enabled: _loaded && !_busy,
-        autocorrect: false, enableSuggestions: false,
-        decoration: const InputDecoration(labelText: '동기화 토큰')),
-      DropdownButton<int>(value: _days, items: const [
-        DropdownMenuItem(value: 1, child: Text('하루 한 번')),
-        DropdownMenuItem(value: 7, child: Text('일주일 한 번')),
-      ], onChanged: !_loaded || _busy ? null : (value) => setState(() => _days = value!)),
-      ElevatedButton(onPressed: !_loaded || _busy ? null : _save, child: const Text('저장')),
-      ElevatedButton(onPressed: !_loaded || _busy ? null : _sync, child: Text(_busy ? '동기화 중…' : '지금 동기화')),
-      Text(_message),
-    ]),
+    body: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          '선택한 주기가 지난 뒤 앱을 열면 작품 북마크를 동기화합니다. 폴더·작가 북마크·읽은 기록·다운로드는 기기별로 유지됩니다. 새로 받은 북마크는 미분류 폴더에 들어갑니다.',
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _server,
+          enabled: _loaded && !_busy,
+          decoration: const InputDecoration(
+            labelText: '서버 주소 (http://서버IP:3002)',
+          ),
+        ),
+        TextField(
+          controller: _token,
+          obscureText: true,
+          enabled: _loaded && !_busy,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(labelText: '동기화 토큰'),
+        ),
+        DropdownButton<int>(
+          value: _days,
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('하루 한 번')),
+            DropdownMenuItem(value: 7, child: Text('일주일 한 번')),
+          ],
+          onChanged: !_loaded || _busy
+              ? null
+              : (value) => setState(() => _days = value!),
+        ),
+        ElevatedButton(
+          onPressed: !_loaded || _busy ? null : _save,
+          child: const Text('저장'),
+        ),
+        ElevatedButton(
+          onPressed: !_loaded || _busy ? null : _sync,
+          child: Text(_busy ? '동기화 중…' : '지금 동기화'),
+        ),
+        Text(_message),
+      ],
+    ),
   );
 }
