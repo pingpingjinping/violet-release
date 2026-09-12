@@ -29,6 +29,7 @@ class DownloadService {
   static final instance = DownloadService._();
   static const _screen = MethodChannel('xyz.project.violet/downloadScreen');
   final changes = ValueNotifier<int>(0);
+  final completed = ValueNotifier<DownloadItemModel?>(null);
   final Map<int, DownloadProgress> _jobs = {};
   Future<void>? _initializing;
   final _submission = Lock();
@@ -161,6 +162,7 @@ class DownloadService {
         await routine.setFailed('일부 페이지를 받지 못했습니다. 재시도하면 누락된 페이지를 받습니다.');
       } else {
         await routine.setDownloadComplete();
+        completed.value = job.item;
       }
     } catch (error) {
       if (!job.cancelled) await routine.setFailed(error.toString());

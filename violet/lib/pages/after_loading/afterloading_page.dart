@@ -63,6 +63,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     WidgetsBinding.instance.addObserver(this);
     unawaited(BookmarkSync.automatic());
     FToast().init(context);
+    DownloadService.instance.completed.addListener(_downloadCompleted);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(DownloadService.instance.initialize().catchError((Object error) {
         debugPrint('Download initialization: $error');
@@ -87,9 +88,20 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
 
   bool _alreadyLocked = false;
 
+  void _downloadCompleted() {
+    final item = DownloadService.instance.completed.value;
+    if (!mounted || item == null) return;
+    showToast(
+      icon: Icons.download,
+      level: ToastLevel.check,
+      message: '${item.url()} ${Translations.instance!.trans('download')} ${Translations.instance!.trans('complete')}',
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    DownloadService.instance.completed.removeListener(_downloadCompleted);
     _deeplinkSubscription?.cancel();
     _shareSubscription?.cancel();
     super.dispose();
