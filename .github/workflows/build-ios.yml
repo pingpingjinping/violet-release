@@ -28,11 +28,12 @@ jobs:
           rustup default stable
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
-      - name: Prepare Flutter iOS build
+      - name: Install Flutter & Pod dependencies
         working-directory: violet
         run: |
           flutter pub get
-          flutter build ios --config-only --release
+          cd ios
+          pod install
 
       - name: Build Xcode Workspace directly (No Codesign)
         working-directory: violet/ios
@@ -40,6 +41,7 @@ jobs:
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
+            -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -derivedDataPath ../build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
