@@ -21,14 +21,12 @@ jobs:
       - name: Set up Rust & iOS Targets
         run: |
           rustup default stable
-          rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+          rustup update
+          rustup target add aarch64-apple-ios --force || true
+          rustup target add aarch64-apple-ios-sim --force || true
+          rustup target add x86_64-apple-ios --force || true
 
-      - name: Install CocoaPods dependencies
-        working-directory: violet/ios
-        run: |
-          pod install --repo-update
-
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         working-directory: violet
         run: flutter pub get
 
