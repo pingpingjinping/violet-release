@@ -2,43 +2,61 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [ "dev", "main", "master" ]
+    branches: ["dev", "main", "master"]
   workflow_dispatch:
 
 jobs:
   build-ios:
     runs-on: macos-14
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Select Xcode 16
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+          for xcode_path in \
+            /Applications/Xcode_16.0.app \
+            /Applications/Xcode_16.1.app \
+            /Applications/Xcode_16.app; do
+            if [ -d "$xcode_path" ]; then
+              sudo xcode-select -s "$xcode_path/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "Xcode 16 was not found."
+          exit 1
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.4'
+          flutter-version: "3.35.4"
           cache: true
 
-      - name: Fix Rustup and Install iOS Targets
+      - name: Set up Rust and iOS targets
         run: |
           mkdir -p ~/.rustup/downloads
           rustup default stable
-          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+          rustup target add \
+            aarch64-apple-ios \
+            aarch64-apple-ios-sim \
+            x86_64-apple-ios
 
-      - name: Install Flutter & Pod dependencies
+      - name: Prepare Flutter and CocoaPods
         working-directory: violet
         run: |
           flutter pub get
+          flutter build ios --config-only --release --no-codesign
           cd ios
           pod install
 
-      - name: Build Xcode Workspace directly (No Codesign)
+      - name: Build iOS app without code signing
         working-directory: violet/ios
         run: |
-          xcodebuild -workspace Runner.xcworkspace \
+          set -o pipefail
+          xcodebuild \
+            -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
@@ -47,19 +65,35 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee "$GITHUB_WORKSPACE/xcodebuild.log"
 
-      - name: Package Payload to IPA
+      - name: Package IPA
         working-directory: violet
         run: |
-          APP_DIR=$(find build/DerivedData/Build/Products/Release-iphoneos -name "Runner.app" -type d | head -n 1)
-          mkdir Payload
-          cp -r "$APP_DIR" Payload/
-          zip -r violet.ipa Payload
-          mv violet.ipa $GITHUB_WORKSPACE/
+          APP_DIR="build/DerivedData/Build/Products/Release-iphoneos/Runner.app"
 
-      - name: Upload IPA Artifact
+          if [ ! -d "$APP_DIR" ]; then
+            echo "Runner.app was not found."
+            exit 1
+          fi
+
+          mkdir -p build/ipa/Payload
+          ditto "$APP_DIR" build/ipa/Payload/Runner.app
+
+          cd build/ipa
+          zip -r "$GITHUB_WORKSPACE/violet.ipa" Payload
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: violet-custom-ipa
           path: violet.ipa
+          if-no-files-found: error
+
+      - name: Upload Xcode build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcode-build-log
+          path: xcodebuild.log
+          if-no-files-found: ignore
