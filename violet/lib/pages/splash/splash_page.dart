@@ -39,6 +39,7 @@ import 'package:violet/server/violet_v2.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/variables.dart';
 import 'package:violet/version/sync.dart';
+import 'package:violet/services/content_db_sync.dart';
 import 'package:violet/widgets/radio_tile.dart';
 
 class SplashPage extends StatefulWidget {
@@ -64,6 +65,9 @@ class _SplashPageState extends State<SplashPage> {
   bool backupBookmark = false;
   bool showMessage = false;
   String message = '';
+  String? _contentStage;
+  int _contentReceived = 0;
+  int _contentTotal = 0;
 
   final imgSize = {
     'dummy': '0MB',
@@ -165,8 +169,23 @@ class _SplashPageState extends State<SplashPage> {
 
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getInt('db_exists') == 1 && !widget.switching) {
+      await ContentDbSync.startup(
+        canApply: () => mounted,
+        onProgress: (stage, received, total) {
+          if (!mounted) return;
+          setState(() {
+            _contentStage = stage;
+            _contentReceived = received;
+            _contentTotal = total;
+          });
+        },
+      );
+      if (!mounted) return;
+      setState(() => _contentStage = null);
+
       var connectivityResult = await (Connectivity().checkConnectivity());
-      if (Settings.useChunkSync.value &&
+      if ((prefs.getBool('auto_content_db_update') ?? true) &&
+          Settings.useChunkSync.value &&
           !connectivityResult.contains(ConnectivityResult.none)) {
         try {
           _changeMessage('check sync...');
@@ -281,6 +300,42 @@ class _SplashPageState extends State<SplashPage> {
             _firstPage(),
             _dbSelector(),
             _languageSelector(),
+            if (_contentStage != null)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Settings.majorColor.value,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _contentStage!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          LinearProgressIndicator(
+                            value: _contentTotal > 0
+                                ? _contentReceived / _contentTotal
+                                : null,
+                          ),
+                          if (_contentTotal > 0) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              '${(_contentReceived / _contentTotal * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

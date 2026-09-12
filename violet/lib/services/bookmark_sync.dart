@@ -20,6 +20,8 @@ class BookmarkSync {
 
   static Future<void> automatic() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('auto_record_sync') ?? true)) return;
       await sync();
     } catch (_) {
       Logger.error('[BookmarkSync] Automatic sync failed; local data retained');

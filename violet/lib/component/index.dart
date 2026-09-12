@@ -307,11 +307,16 @@ class HentaiIndex {
     }
   }
 
+  static List<(String, double)> calculateSimilarsInWorker(
+    (Map<String, dynamic>, String) input,
+  ) => _calculateSimilars(input.$1, input.$2);
+
   static List<(String, double)> _calculateSimilars(
     Map<String, dynamic> map,
     String artist,
   ) {
     var rr = map[artist];
+    if (rr == null) return [];
     var result = <(String, double)>[];
 
     map.forEach((key, value) {

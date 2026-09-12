@@ -1,4 +1,3 @@
-import 'package:violet/services/content_db_sync.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -62,7 +61,6 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(BookmarkSync.automatic());
-    unawaited(_refreshContent());
     FToast().init(context);
 
     if (Platform.isAndroid ||
@@ -81,15 +79,6 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     });
   }
 
-  Future<void> _refreshContent() async {
-    final changed = await ContentDbSync.automatic(
-      () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
-    );
-    if (changed && mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-      Navigator.of(context).pushReplacementNamed('/AfterLoading');
-    }
-  }
-
   bool _alreadyLocked = false;
 
   @override
@@ -106,7 +95,6 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     switch (state) {
       case AppLifecycleState.resumed:
         unawaited(BookmarkSync.automatic());
-        unawaited(_refreshContent());
         if (Settings.useLockScreen.value &&
             Settings.useSecureMode.value &&
             !_alreadyLocked) {
@@ -359,6 +347,14 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     5,
     (index) => GlobalKey(),
   );
+
+  late final List<Widget> _tabs = [
+    SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
+    HotPage(key: _widgetKeys[1]),
+    BookmarkPage(key: _widgetKeys[2]),
+    DownloadPage(key: _widgetKeys[3]),
+    SettingsPage(key: _widgetKeys[4]),
+  ];
 
   Widget _buildBottomNavigationBar(BuildContext context) {
     final translations = Translations.instance!;
@@ -634,13 +630,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
                   onPageChanged: (newPage) {
                     setState(() {});
                   },
-                  children: <Widget>[
-                    SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
-                    HotPage(key: _widgetKeys[1]),
-                    BookmarkPage(key: _widgetKeys[2]),
-                    DownloadPage(key: _widgetKeys[3]),
-                    SettingsPage(key: _widgetKeys[4]),
-                  ],
+                  children: _tabs,
                 ),
               ],
             ),

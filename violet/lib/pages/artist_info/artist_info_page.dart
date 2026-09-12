@@ -10,6 +10,7 @@ import 'package:expandable/expandable.dart';
 import 'package:flare_flutter/flare_actor.dart';
 import 'package:flare_flutter/flare_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:html_unescape/html_unescape_small.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -95,9 +96,12 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
       //
       //  Title based article clustering
       //
-      series = HitomiTitleCluster.doClustering(
+      if (!mounted) return;
+      series = await compute(
+        HitomiTitleCluster.doClustering,
         cc.map((e) => e.title() as String).toList(),
-      ).toList();
+      );
+      if (!mounted) return;
 
       //
       //  Statistics
@@ -138,22 +142,38 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
       //
       switch (widget.type) {
         case ArtistType.artist:
-          similars = HentaiIndex.calculateSimilarArtists(widget.name);
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagArtist,
+            widget.name,
+          ));
           break;
         case ArtistType.group:
-          similars = HentaiIndex.calculateSimilarGroups(widget.name);
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagGroup,
+            widget.name,
+          ));
           break;
         case ArtistType.uploader:
-          similars = HentaiIndex.calculateSimilarUploaders(widget.name);
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagUploader,
+            widget.name,
+          ));
           break;
         case ArtistType.series:
-          similars = HentaiIndex.calculateSimilarSeries(widget.name);
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagSeries,
+            widget.name,
+          ));
           break;
         case ArtistType.character:
-          similars = HentaiIndex.calculateSimilarCharacter(widget.name);
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagCharacter,
+            widget.name,
+          ));
           break;
       }
 
+      if (!mounted) return;
       similarsAll = similars;
       similars = similars.take(6).toList();
 
@@ -181,11 +201,13 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
         await querySimilars(relatedCOSSingle, widget.type, qrsCOSSingle);
       }
 
+      if (!mounted) return;
       setState(() {
         qureyLoaded = true;
       });
 
       Future.delayed(const Duration(milliseconds: 300)).then((value) {
+        if (!mounted) return;
         ec.expanded = true;
         commentAreaEC.expanded = true;
       });
