@@ -154,7 +154,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     /// to
     /// /var/mobile/Containers/Data/Application/<new-app-code>/Documents
 
-    final newPath = _documentsPath ??= (await getApplicationDocumentsDirectory()).path;
+    final newPath = _documentsPath ??=
+        (await getApplicationDocumentsDirectory()).path;
 
     for (var item in items) {
       final paths = (item.files(), item.path());
@@ -211,13 +212,18 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       queryResults[element.id()] = element;
     }
     // Show local data without waiting for metadata missing from the content DB.
-    final missing = articles.where((id) => !queryResults.containsKey(id)).toList();
+    final missing = articles
+        .where((id) => !queryResults.containsKey(id))
+        .toList();
     if (missing.isNotEmpty) {
       unawaited(_loadMissingQueryResults(missing, revision));
     }
   }
 
-  Future<void> _loadMissingQueryResults(List<int> articles, int revision) async {
+  Future<void> _loadMissingQueryResults(
+    List<int> articles,
+    int revision,
+  ) async {
     for (final id in articles) {
       if (!mounted || revision != _queryRevision) return;
       await catchUnwind(() async {
@@ -229,18 +235,18 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
               headers: headers,
             )
             .timeout(const Duration(seconds: 8));
-        if (!mounted ||
-            revision != _queryRevision ||
-            res.statusCode != 200) {
+        if (!mounted || revision != _queryRevision || res.statusCode != 200) {
           return;
         }
         final article = await HitomiParser.parseGalleryBlock(res.body);
         if (!mounted || revision != _queryRevision) return;
-        queryResults[id] = QueryResult(result: {
-          'Id': id,
-          'Title': article['Title'],
-          'Artists': article['Artists'].join('|'),
-        });
+        queryResults[id] = QueryResult(
+          result: {
+            'Id': id,
+            'Title': article['Title'],
+            'Artists': article['Artists'].join('|'),
+          },
+        );
         await _applyFilter();
         if (mounted && revision == _queryRevision) setState(() {});
       });
