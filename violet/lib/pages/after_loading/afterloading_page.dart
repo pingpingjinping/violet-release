@@ -33,6 +33,7 @@ import 'package:violet/update/update_manager.dart';
 import 'package:violet/variables.dart';
 import 'package:violet/version/update_sync.dart';
 import 'package:violet/widgets/patch_note_prompt.dart';
+import 'package:violet/services/bookmark_sync.dart';
 
 class AfterLoadingPage extends StatefulWidget {
   const AfterLoadingPage({super.key});
@@ -59,6 +60,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(BookmarkSync.automatic());
     FToast().init(context);
 
     if (Platform.isAndroid ||
@@ -92,6 +94,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     super.didChangeAppLifecycleState(state);
     switch (state) {
       case AppLifecycleState.resumed:
+        unawaited(BookmarkSync.automatic());
         if (Settings.useLockScreen.value &&
             Settings.useSecureMode.value &&
             !_alreadyLocked) {

@@ -1,5 +1,5 @@
 const DB_NAME = 'violet-user-database';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const USER_STORES = {
   bookmarkGroups: 'bookmark-groups',
@@ -7,6 +7,7 @@ export const USER_STORES = {
   bookmarkArtists: 'bookmark-artists',
   bookmarkCrops: 'bookmark-crops',
   readHistory: 'read-history',
+  bookmarkSync: 'bookmark-sync',
 } as const;
 
 type UserStoreName = (typeof USER_STORES)[keyof typeof USER_STORES];
@@ -37,6 +38,37 @@ function openUserDB(): Promise<IDBDatabase> {
     };
 
     request.onerror = () => reject(request.error);
+  });
+}
+
+// Sync metadata and bookmark changes commit together so crashes cannot turn
+// downloaded changes into a new batch of local edits.
+export async function transactBookmarkSync<T>(
+  action: (articles: any[], state: any, articlesStore: IDBObjectStore, metaStore: IDBObjectStore) => T,
+): Promise<T> {
+  const db = await openUserDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([USER_STORES.bookmarkArticles, USER_STORES.bookmarkSync], 'readwrite');
+    const articlesStore = tx.objectStore(USER_STORES.bookmarkArticles);
+    const metaStore = tx.objectStore(USER_STORES.bookmarkSync);
+    const articlesRequest = articlesStore.getAll();
+    const stateRequest = metaStore.get('state');
+    let completed = 0;
+    let result: T;
+    const ready = () => {
+      if (++completed !== 2) return;
+      try {
+        result = action(articlesRequest.result, stateRequest.result, articlesStore, metaStore);
+      } catch (error) {
+        tx.abort();
+        reject(error);
+      }
+    };
+    articlesRequest.onsuccess = ready;
+    stateRequest.onsuccess = ready;
+    tx.oncomplete = () => resolve(result);
+    tx.onabort = () => reject(tx.error ?? new Error('Bookmark transaction aborted'));
+    tx.onerror = () => reject(tx.error);
   });
 }
 

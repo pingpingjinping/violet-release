@@ -1,0 +1,20 @@
+services:
+  db-download:
+    image: python:3.12-alpine
+    working_dir: /app
+    command: ["python", "-u", "server.py"]
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - ./bookmark_sync.py:/app/bookmark_sync.py:ro
+      - ./export:/export
+      - ./state:/state
+      - content-db:/content-data
+    mem_limit: 128m
+    restart: unless-stopped
+
+volumes:
+  content-db:
+    external: true
+    name: violet_violet-content-db

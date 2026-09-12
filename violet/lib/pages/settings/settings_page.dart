@@ -70,6 +70,7 @@ import 'package:violet/version/sync.dart';
 import 'package:violet/version/update_sync.dart';
 import 'package:violet/widgets/theme_switchable_state.dart';
 import 'package:violet/network/wrapper.dart' as http;
+import 'package:violet/pages/settings/bookmark_sync_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -103,6 +104,16 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
         ..addAll(_systemGroup())
         ..addAll(_securityGroup())
         ..addAll(_databaseGroup())
+        ..addAll([
+          ListTile(
+            leading: const Icon(Icons.sync),
+            title: const Text('앱·웹 작품 북마크 동기화'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const BookmarkSyncPage())),
+          ),
+        ])
         ..addAll(_networkingGroup())
         ..addAll(_downloadGroup())
         ..addAll(_bookmarkGroup())

@@ -20,6 +20,7 @@ import 'package:violet/pages/segment/platform_navigator.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/style/palette.dart';
 import 'package:violet/widgets/theme_switchable_state.dart';
+import 'package:violet/services/bookmark_sync.dart';
 
 class BookmarkPage extends StatefulWidget {
   const BookmarkPage({super.key});
@@ -33,6 +34,22 @@ class _BookmarkPageState extends ThemeSwitchableState<BookmarkPage>
   @override
   bool get wantKeepAlive => true;
   bool reorder = false;
+
+  @override
+  void initState() {
+    super.initState();
+    BookmarkSync.changes.addListener(_refreshSyncedBookmarks);
+  }
+
+  void _refreshSyncedBookmarks() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    BookmarkSync.changes.removeListener(_refreshSyncedBookmarks);
+    super.dispose();
+  }
 
   @override
   VoidCallback? get shouldReloadCallback => null;
