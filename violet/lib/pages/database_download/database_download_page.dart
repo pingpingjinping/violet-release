@@ -21,7 +21,6 @@ import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/common/toast.dart';
 import 'package:violet/settings/settings.dart';
-import 'package:violet/src/rust/api/simple.dart';
 import 'package:violet/version/sync.dart';
 
 typedef TagIndexingCallback = dynamic Function(QueryResult);

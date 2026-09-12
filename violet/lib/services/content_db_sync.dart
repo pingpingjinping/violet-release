@@ -50,7 +50,12 @@ class ContentDbSync {
       }
       if (version == null || version <= 0 || download == null ||
           !['http', 'https'].contains(download.scheme)) return false;
-      if ((prefs.getInt('content-snapshot-version') ?? prefs.getInt('synclatest')) == version) return false;
+      if ((prefs.getInt('content-snapshot-version') ??
+              prefs.getInt('synclatest')) ==
+          version) {
+        return false;
+      }
+      if (!canApply()) return false;
       final manager = await DataBaseManager.getInstance();
       final destination = File(manager.dbPath!);
       temporary = File('${destination.path}.updating');
