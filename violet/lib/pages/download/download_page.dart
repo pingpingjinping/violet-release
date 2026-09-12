@@ -111,34 +111,37 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
   void refresh({bool immediate = false}) {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer(immediate ? Duration.zero : const Duration(milliseconds: 200), () async {
-      if (!mounted) return;
-      if (_refreshing) {
-        _refreshAgain = true;
-        return;
-      }
-      _refreshing = true;
-      try {
-      _getDownloadWidgetKey().forEach((key, value) {
-        value.currentState?.thubmanilReload();
-      });
-      items = await DownloadService.instance.items();
-      if (!mounted) return;
-      itemsMap = {for (final item in items) item.id(): item};
-      // Keep the previous list visible until replacement data is ready.
-      await _autoRecoveryFileName();
-      await _buildQueryResults();
-      if (!mounted) return;
-      await _applyFilter();
-      if (mounted) setState(() {});
-      } finally {
-        _refreshing = false;
-        if (_refreshAgain && mounted) {
-          _refreshAgain = false;
-          refresh(immediate: true);
+    _refreshTimer = Timer(
+      immediate ? Duration.zero : const Duration(milliseconds: 200),
+      () async {
+        if (!mounted) return;
+        if (_refreshing) {
+          _refreshAgain = true;
+          return;
         }
-      }
-    });
+        _refreshing = true;
+        try {
+          _getDownloadWidgetKey().forEach((key, value) {
+            value.currentState?.thubmanilReload();
+          });
+          items = await DownloadService.instance.items();
+          if (!mounted) return;
+          itemsMap = {for (final item in items) item.id(): item};
+          // Keep the previous list visible until replacement data is ready.
+          await _autoRecoveryFileName();
+          await _buildQueryResults();
+          if (!mounted) return;
+          await _applyFilter();
+          if (mounted) setState(() {});
+        } finally {
+          _refreshing = false;
+          if (_refreshAgain && mounted) {
+            _refreshAgain = false;
+            refresh(immediate: true);
+          }
+        }
+      },
+    );
   }
 
   Future<void> _autoRecoveryFileName() async {
@@ -220,11 +223,17 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       await catchUnwind(() async {
         final headers = await ScriptManager.runHitomiGetHeaderContent('$id');
         if (!mounted || revision != _queryRevision) return;
-        final res = await http.get(
-          'https://ltn.gold-usergeneratedcontent.net/galleryblock/$id.html',
-          headers: headers,
-        ).timeout(const Duration(seconds: 8));
-        if (!mounted || revision != _queryRevision || res.statusCode != 200) return;
+        final res = await http
+            .get(
+              'https://ltn.gold-usergeneratedcontent.net/galleryblock/$id.html',
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 8));
+        if (!mounted ||
+            revision != _queryRevision ||
+            res.statusCode != 200) {
+          return;
+        }
         final article = await HitomiParser.parseGalleryBlock(res.body);
         if (!mounted || revision != _queryRevision) return;
         queryResults[id] = QueryResult(result: {
@@ -1189,282 +1198,3 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                 (
                   BuildContext context,
                   Animation<double> animation,
-                  Animation<double> secondaryAnimation,
-                  Widget wi,
-                ) {
-                  return FadeTransition(opacity: animation, child: wi);
-                },
-            pageBuilder: (_, __, ___) => const DownloadViewType(),
-            barrierColor: Colors.black12,
-            barrierDismissible: true,
-          ),
-        )
-        .then((value) async {
-          if (rtype != Settings.downloadResultType.value) {
-            var downloadWidgetKey = _getDownloadWidgetKey();
-            downloadWidgetKey.forEach(
-              (key, value) =>
-                  downloadWidgetKey[key] = GlobalKey<DownloadItemWidgetState>(),
-            );
-            await Future.delayed(const Duration(milliseconds: 50), () {
-              setState(() {});
-            });
-          }
-        });
-  }
-
-  Future<void> _alignDoubleTap() async {
-    var rtype = Settings.downloadAlignType.value;
-    Navigator.of(context)
-        .push(
-          PageRouteBuilder(
-            opaque: false,
-            transitionDuration: const Duration(milliseconds: 500),
-            transitionsBuilder:
-                (
-                  BuildContext context,
-                  Animation<double> animation,
-                  Animation<double> secondaryAnimation,
-                  Widget wi,
-                ) {
-                  return FadeTransition(opacity: animation, child: wi);
-                },
-            pageBuilder: (_, __, ___) => const DownloadAlignType(),
-            barrierColor: Colors.black12,
-            barrierDismissible: true,
-          ),
-        )
-        .then((value) async {
-          if (rtype != Settings.downloadAlignType.value) {
-            _getDownloadWidgetKey().forEach((key, value) {
-              if (value.currentState != null) {
-                value.currentState?.thubmanilReload();
-              }
-            });
-            _applyFilter();
-          }
-        });
-  }
-
-  Future<void> _alignLongPress() async {
-    PlatformNavigator.navigateFade(
-      context,
-      Provider<FilterController>.value(
-        value: _filterController,
-        child: FilterPage(
-          queryResult: queryResults.entries.map((e) => e.value).toList(),
-        ),
-      ),
-    ).then((value) {
-      _getDownloadWidgetKey().forEach((key, value) {
-        value.currentState?.thubmanilReload();
-      });
-      _applyFilter();
-    });
-  }
-
-  Future<void> _applyFilter() async {
-    var downloading = <int>[];
-    var result = <int>[];
-    var isOr = _filterController.isOr;
-    for (var element in itemsMap.entries) {
-      // 1: Pending
-      // 2: Extracting
-      // 3: Downloading
-      // 4: Post Processing
-      if (1 <= element.value.state() && element.value.state() <= 4) {
-        downloading.add(element.key);
-        continue;
-      }
-
-      if (int.tryParse(element.value.url()) == null) continue;
-      final qr = queryResults[int.parse(element.value.url())];
-      if (qr == null) continue;
-
-      // key := <group>:<name>
-      var succ = !_filterController.isOr;
-      _filterController.tagStates.forEach((key, value) {
-        if (!value) return;
-
-        // Check match just only one
-        if (succ == isOr) return;
-
-        // Get db column name from group
-        var split = key.split('|');
-        var dbColumn = prefix2Tag(split[0]);
-
-        // There is no matched db column name
-        if (qr.result[dbColumn] == null && !isOr) {
-          succ = false;
-          return;
-        }
-
-        // If Single Tag
-        if (!isSingleTag(split[0])) {
-          var tag = split[1];
-          if (['female', 'male'].contains(split[0])) {
-            tag = '${split[0]}:${split[1]}';
-          }
-          if ((qr.result[dbColumn] as String).contains('|$tag|') == isOr) {
-            succ = isOr;
-          }
-        }
-        // If Multitag
-        else if ((qr.result[dbColumn] as String == split[1]) == isOr) {
-          succ = isOr;
-        }
-      });
-      if (succ) result.add(element.key);
-    }
-
-    if (_filterController.tagStates.isNotEmpty) {
-      filterResult = result.map((e) => itemsMap[e]!).toList();
-    } else {
-      filterResult = items.toList();
-    }
-
-    if (_filterController.isPopulationSort) {
-      Population.sortByPopulationDownloadItem(filterResult);
-    }
-
-    if (Settings.downloadAlignType.value > 0) {
-      final user = await User.getInstance();
-      final userlog = await user.getUserLog();
-      final articlereadlog = <int, DateTime>{};
-
-      for (var element in userlog) {
-        final id = int.tryParse(element.articleId());
-        if (id == null) {
-          Logger.warning(
-            '[download-_applyFilter] articleId is not int type: ${element.articleId()}',
-          );
-          continue;
-        }
-        if (!articlereadlog.containsKey(id)) {
-          final dt = DateTime.tryParse(element.datetimeStart());
-          if (dt != null) {
-            articlereadlog[id] = dt;
-          } else {
-            Logger.warning(
-              '[download-_applyFilter] datetimeStart is not DateTime type: ${element.datetimeStart()}',
-            );
-          }
-        }
-      }
-
-      filterResult.sort((x, y) {
-        if (int.tryParse(x.url()) == null) return 1;
-        if (int.tryParse(y.url()) == null) return -1;
-
-        var xx = int.tryParse(x.url());
-        var yy = int.tryParse(y.url());
-
-        if (Settings.downloadAlignType.value == 3) {
-          return y.filesWithoutThumbnail().length.compareTo(
-            x.filesWithoutThumbnail().length,
-          );
-        } else if (Settings.downloadAlignType.value == 2) {
-          if (!queryResults.containsKey(xx)) return 1;
-          if (!queryResults.containsKey(yy)) return -1;
-
-          final a1 = queryResults[xx]!.groups();
-          final a2 = queryResults[yy]!.groups();
-
-          if (a1 == null || a1 == '' || a1 == '|N/A|') return 1;
-          if (a2 == null || a2 == '' || a2 == '|N/A|') return -1;
-
-          final aa1 = (a1 as String)
-              .split('|')
-              .firstWhere((element) => element != '');
-          final aa2 = (a2 as String)
-              .split('|')
-              .firstWhere((element) => element != '');
-
-          return aa1.compareTo(aa2);
-        } else if (Settings.downloadAlignType.value == 1) {
-          if (!queryResults.containsKey(xx)) return 1;
-          if (!queryResults.containsKey(yy)) return -1;
-
-          final a1 = queryResults[xx]!.artists();
-          final a2 = queryResults[yy]!.artists();
-
-          if (a1 == null || a1 == '' || a1 == '|N/A|') return 1;
-          if (a2 == null || a2 == '' || a2 == '|N/A|') return -1;
-
-          final aa1 = (a1 as String)
-              .split('|')
-              .firstWhere((element) => element != '');
-          final aa2 = (a2 as String)
-              .split('|')
-              .firstWhere((element) => element != '');
-
-          return aa1.compareTo(aa2);
-        } else if (Settings.downloadAlignType.value == 4) {
-          if (!articlereadlog.containsKey(xx)) return 1;
-          if (!articlereadlog.containsKey(yy)) return -1;
-
-          return articlereadlog[yy]!.compareTo(articlereadlog[xx]!);
-        }
-
-        return 0;
-      });
-      filterResult = filterResult.reversed.toList();
-    }
-
-    if (_filterController.tagStates.isNotEmpty && downloading.isNotEmpty) {
-      filterResult.addAll(downloading.map((e) => itemsMap[e]!).toList());
-    }
-
-    if (mounted) setState(() {});
-  }
-
-  static String prefix2Tag(String prefix) {
-    switch (prefix) {
-      case 'artist':
-        return 'Artists';
-      case 'group':
-        return 'Groups';
-      case 'language':
-        return 'Language';
-      case 'character':
-        return 'Characters';
-      case 'series':
-        return 'Series';
-      case 'class':
-        return 'Class';
-      case 'type':
-        return 'Type';
-      case 'uploader':
-        return 'Uploader';
-      case 'tag':
-      case 'female':
-      case 'male':
-        return 'Tags';
-    }
-    return '';
-  }
-
-  static bool isSingleTag(String prefix) {
-    switch (prefix) {
-      case 'language':
-      case 'class':
-      case 'type':
-      case 'uploader':
-        return true;
-      case 'artist':
-      case 'group':
-      case 'character':
-      case 'tag':
-      case 'female':
-      case 'male':
-      case 'series':
-      default:
-        return false;
-    }
-  }
-
-  Future<void> appendTask(String url) => DownloadService.instance.enqueue(url);
-
-  Future<void> appendTaskFromQueryResult(QueryResult qr) =>
-      DownloadPageManager.add(qr);
-}

@@ -190,9 +190,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
         SliverPersistentHeader(
           floating: true,
           delegate: AnimatedOpacitySliver(
-            searchBar: Stack(
-              children: <Widget>[searchBar(), align()],
-            ),
+            searchBar: Stack(children: <Widget>[searchBar(), align()]),
           ),
         )
       else
