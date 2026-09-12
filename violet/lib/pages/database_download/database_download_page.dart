@@ -206,39 +206,39 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       if (widget.dbType! == 'global') {
         final downloadedPath = '${dir.path}/db.sql.7z';
 
-final downloadedDb = await openDatabase(
-  downloadedPath,
-  readOnly: true,
-  singleInstance: false,
-);
+        final downloadedDb = await openDatabase(
+          downloadedPath,
+          readOnly: true,
+          singleInstance: false,
+        );
 
-try {
-  final check = await downloadedDb.rawQuery('PRAGMA quick_check');
-  if (check.isEmpty || check.first.values.first != 'ok') {
-    throw Exception('Downloaded database failed validation');
-  }
+        try {
+          final check = await downloadedDb.rawQuery('PRAGMA quick_check');
+          if (check.isEmpty || check.first.values.first != 'ok') {
+            throw Exception('Downloaded database failed validation');
+          }
 
-  final rows = await downloadedDb.rawQuery(
-    'SELECT COUNT(*) AS count FROM HitomiColumnModel',
-  );
-  if ((rows.first['count'] as int) == 0) {
-    throw Exception('Downloaded database contains no articles');
-  }
-} finally {
-  await downloadedDb.close();
-}
+          final rows = await downloadedDb.rawQuery(
+            'SELECT COUNT(*) AS count FROM HitomiColumnModel',
+          );
+          if ((rows.first['count'] as int) == 0) {
+            throw Exception('Downloaded database contains no articles');
+          }
+        } finally {
+          await downloadedDb.close();
+        }
 
-await DataBaseManager.reloadInstance();
+        await DataBaseManager.reloadInstance();
 
-final destinationPath = Platform.isAndroid
-    ? '${dir.path}/data/data.db'
-    : '${await getDatabasesPath()}/data.db';
+        final destinationPath = Platform.isAndroid
+            ? '${dir.path}/data/data.db'
+            : '${await getDatabasesPath()}/data.db';
 
-await Directory(dirname(destinationPath)).create(recursive: true);
-await File(downloadedPath).rename(destinationPath);
+        await Directory(dirname(destinationPath)).create(recursive: true);
+        await File(downloadedPath).rename(destinationPath);
 
-// This server provides complete Korean snapshots, not incremental chunks.
-await Settings.useChunkSync.setValue(false);
+        // This server provides complete Korean snapshots, not incremental chunks.
+        await Settings.useChunkSync.setValue(false);
       }
 
       final prefs = await SharedPreferences.getInstance();
