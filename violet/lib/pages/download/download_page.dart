@@ -90,7 +90,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   void initState() {
     super.initState();
 
-    refresh();
+    refresh(immediate: true);
     DownloadService.instance.changes.addListener(refresh);
     indexBarDragListener.dragDetails.addListener(_indexChanged);
   }
@@ -104,26 +104,44 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   }
 
   Timer? _refreshTimer;
+  bool _refreshing = false;
+  bool _refreshAgain = false;
+  String? _documentsPath;
+  final Map<int, (String?, String?)> _checkedPaths = {};
 
-  void refresh() {
+  void refresh({bool immediate = false}) {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer(const Duration(milliseconds: 200), () async {
-      if (!mounted) return;
-      _getDownloadWidgetKey().forEach((key, value) {
-        value.currentState?.thubmanilReload();
-      });
-      items = await DownloadService.instance.items();
-      if (!mounted) return;
-      itemsMap = {for (final item in items) item.id(): item};
-      filterResult = [];
-      _listKey = ObjectKey(const Uuid().v4());
-      queryResults = <int, QueryResult>{};
-      await _autoRecoveryFileName();
-      await _buildQueryResults();
-      if (!mounted) return;
-      _applyFilter();
-      if (mounted) setState(() {});
-    });
+    _refreshTimer = Timer(
+      immediate ? Duration.zero : const Duration(milliseconds: 200),
+      () async {
+        if (!mounted) return;
+        if (_refreshing) {
+          _refreshAgain = true;
+          return;
+        }
+        _refreshing = true;
+        try {
+          _getDownloadWidgetKey().forEach((key, value) {
+            value.currentState?.thubmanilReload();
+          });
+          items = await DownloadService.instance.items();
+          if (!mounted) return;
+          itemsMap = {for (final item in items) item.id(): item};
+          // Keep the previous list visible until replacement data is ready.
+          await _autoRecoveryFileName();
+          await _buildQueryResults();
+          if (!mounted) return;
+          await _applyFilter();
+          if (mounted) setState(() {});
+        } finally {
+          _refreshing = false;
+          if (_refreshAgain && mounted) {
+            _refreshAgain = false;
+            refresh(immediate: true);
+          }
+        }
+      },
+    );
   }
 
   Future<void> _autoRecoveryFileName() async {
@@ -136,17 +154,22 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     /// to
     /// /var/mobile/Containers/Data/Application/<new-app-code>/Documents
 
-    final newPath = (await getApplicationDocumentsDirectory()).path;
+    final newPath = _documentsPath ??=
+        (await getApplicationDocumentsDirectory()).path;
 
     for (var item in items) {
+      final paths = (item.files(), item.path());
+      if (_checkedPaths[item.id()] == paths) continue;
       if (item.files() == null) continue;
 
       if (item.files() != null &&
           item.files()!.toLowerCase().contains(newPath.toLowerCase())) {
+        _checkedPaths[item.id()] = paths;
         continue;
       }
       if (item.path() != null &&
           item.path()!.toLowerCase().contains(newPath.toLowerCase())) {
+        _checkedPaths[item.id()] = paths;
         continue;
       }
 
@@ -167,63 +190,67 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       item.result = result;
 
       await item.update();
+      _checkedPaths[item.id()] = (item.files(), item.path());
     }
   }
 
+  int _queryRevision = 0;
+
   Future<void> _buildQueryResults() async {
-    var articles = <int>[];
-    for (final item in items) {
-      if (item.state() == 0 && int.tryParse(item.url()) != null) {
-        articles.add(int.parse(item.url()));
-        itemsMap[item.id()] = item;
-      }
+    final revision = ++_queryRevision;
+    final articles = items
+        .where((item) => item.state() == 0 && int.tryParse(item.url()) != null)
+        .map((item) => int.parse(item.url()))
+        .toSet()
+        .toList();
+    if (articles.isEmpty) return;
+    final value = await QueryManager.query(
+      'SELECT * FROM HitomiColumnModel WHERE Id IN (${articles.join(',')})',
+    );
+    if (!mounted || revision != _queryRevision) return;
+    for (final element in value.results ?? <QueryResult>[]) {
+      queryResults[element.id()] = element;
     }
+    // Show local data without waiting for metadata missing from the content DB.
+    final missing = articles
+        .where((id) => !queryResults.containsKey(id))
+        .toList();
+    if (missing.isNotEmpty) {
+      unawaited(_loadMissingQueryResults(missing, revision));
+    }
+  }
 
-    var queryRaw = 'SELECT * FROM HitomiColumnModel WHERE ';
-    queryRaw += 'Id IN (${articles.map((e) => e).join(',')})';
-
-    QueryManager.query(queryRaw).then((value) async {
-      var qr = <int, QueryResult>{};
-      for (final element in value.results!) {
-        qr[element.id()] = element;
-      }
-
-      var result = <QueryResult>[];
-      for (final element in articles) {
-        if (qr[element] == null) {
-          await catchUnwind(() async {
-            final headers = await ScriptManager.runHitomiGetHeaderContent(
-              '$element',
-            );
-            final res = await http.get(
-              'https://ltn.gold-usergeneratedcontent.net/galleryblock/$element.html',
+  Future<void> _loadMissingQueryResults(
+    List<int> articles,
+    int revision,
+  ) async {
+    for (final id in articles) {
+      if (!mounted || revision != _queryRevision) return;
+      await catchUnwind(() async {
+        final headers = await ScriptManager.runHitomiGetHeaderContent('$id');
+        if (!mounted || revision != _queryRevision) return;
+        final res = await http
+            .get(
+              'https://ltn.gold-usergeneratedcontent.net/galleryblock/$id.html',
               headers: headers,
-            );
-            final article = await HitomiParser.parseGalleryBlock(res.body);
-            final meta = {
-              'Id': element,
-              'Title': article['Title'],
-              'Artists': article['Artists'].join('|'),
-            };
-
-            qr[element] = QueryResult(result: meta);
-          });
+            )
+            .timeout(const Duration(seconds: 8));
+        if (!mounted || revision != _queryRevision || res.statusCode != 200) {
+          return;
         }
-
-        if (qr[element] != null) {
-          result.add(qr[element]!);
-        }
-      }
-
-      for (final element in result) {
-        queryResults[element.id()] = element;
-      }
-
-      if (Settings.downloadAlignType.value != 0 &&
-          Settings.downloadResultType.value.isThreeGrid) {
-        setState(() {});
-      }
-    });
+        final article = await HitomiParser.parseGalleryBlock(res.body);
+        if (!mounted || revision != _queryRevision) return;
+        queryResults[id] = QueryResult(
+          result: {
+            'Id': id,
+            'Title': article['Title'],
+            'Artists': article['Artists'].join('|'),
+          },
+        );
+        await _applyFilter();
+        if (mounted && revision == _queryRevision) setState(() {});
+      });
+    }
   }
 
   final ScrollController _scrollController = ScrollController();
