@@ -139,7 +139,7 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
     setState(() {});
   }
 
-  DownloadProgress? _progress;
+  GalleryDownloadProgress? _progress;
   String? _thumbnailSignature;
 
   void _downloadProcedure() {

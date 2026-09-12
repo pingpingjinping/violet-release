@@ -11,8 +11,8 @@ import 'package:violet/downloader/isolate_downloader.dart';
 import 'package:violet/pages/download/download_routine.dart';
 import 'package:violet/services/download_work_queue.dart';
 
-class DownloadProgress extends ChangeNotifier {
-  DownloadProgress(this.item);
+class GalleryDownloadProgress extends ChangeNotifier {
+  GalleryDownloadProgress(this.item);
   final DownloadItemModel item;
   int extracted = 0, total = 0, completed = 0;
   double bytes = 0, bytesPerSecond = 0;
@@ -30,7 +30,7 @@ class DownloadService {
   static const _screen = MethodChannel('xyz.project.violet/downloadScreen');
   final changes = ValueNotifier<int>(0);
   final completed = ValueNotifier<DownloadItemModel?>(null);
-  final Map<int, DownloadProgress> _jobs = {};
+  final Map<int, GalleryDownloadProgress> _jobs = {};
   Future<void>? _initializing;
   final _submission = Lock();
   late final queue = DownloadWorkQueue(keepAwake: (enabled) async {
@@ -64,7 +64,7 @@ class DownloadService {
     }
   }
 
-  DownloadProgress? progress(int id) => _jobs[id];
+  GalleryDownloadProgress? progress(int id) => _jobs[id];
 
   Future<List<DownloadItemModel>> items() async {
     await initialize();
@@ -92,7 +92,7 @@ class DownloadService {
 
   void _start(DownloadItemModel item, {bool recover = false}) {
     if (queue.contains(item.id())) return;
-    final job = DownloadProgress(item);
+    final job = GalleryDownloadProgress(item);
     _jobs[item.id()] = job;
     job.finished = queue.submit(item.id(), () => _run(job, recover));
     // Failures are stored in the item, so callers do not need to await completion.
@@ -101,7 +101,7 @@ class DownloadService {
     }));
   }
 
-  Future<void> _run(DownloadProgress job, bool recover) async {
+  Future<void> _run(GalleryDownloadProgress job, bool recover) async {
     if (job.cancelled) return;
     final routine = DownloadRoutine(job.item, job.changed, job.changed, shouldCancel: () => job.cancelled);
     job.routine = routine;
