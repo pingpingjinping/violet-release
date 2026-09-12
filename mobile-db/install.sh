@@ -16,6 +16,7 @@ trap 'rm -rf "$task_download_dir"' EXIT
 task_ref="${VIOLET_SYNC_REF:-dev}"
 task_base="https://raw.githubusercontent.com/pingpingjinping/violet-release/$task_ref"
 task_paths='mobile-db/server.py
+mobile-db/backup_store.py
 mobile-db/bookmark_sync.py
 mobile-db/activity_sync.py
 mobile-db/compose.yml
