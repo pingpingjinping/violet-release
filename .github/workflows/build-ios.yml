@@ -18,6 +18,16 @@ jobs:
           flutter-version: '3.35.4'
           cache: true
 
+      - name: Set up Rust & iOS Targets
+        run: |
+          rustup default stable
+          rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+      - name: Install CocoaPods dependencies
+        working-directory: violet/ios
+        run: |
+          pod install --repo-update
+
       - name: Install dependencies
         working-directory: violet
         run: flutter pub get
