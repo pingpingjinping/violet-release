@@ -1,3 +1,5 @@
+import 'package:violet/pages/settings/server_settings_page.dart';
+import 'package:violet/pages/settings/pi_backup_page.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -48,21 +50,18 @@ import 'package:violet/pages/settings/user_manual_page.dart';
 import 'package:violet/pages/settings/patchnote_page.dart';
 import 'package:violet/pages/segment/double_tap_to_top.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
-import 'package:violet/pages/settings/bookmark_version_select.dart';
 import 'package:violet/pages/settings/db_rebuild_page.dart';
 import 'package:violet/pages/settings/import_from_eh.dart';
 import 'package:violet/pages/settings/license_page.dart';
 import 'package:violet/pages/settings/lock_setting_page.dart';
 import 'package:violet/pages/settings/log_page.dart';
 import 'package:violet/pages/settings/login/ehentai_login.dart';
-import 'package:violet/pages/settings/restore_bookmark.dart';
 import 'package:violet/pages/settings/route.dart';
 import 'package:violet/pages/settings/tag_rebuild_page.dart';
 import 'package:violet/pages/settings/tag_selector.dart';
 import 'package:violet/pages/settings/version_page.dart';
 import 'package:violet/pages/splash/splash_page.dart';
 import 'package:violet/platform/misc.dart';
-import 'package:violet/server/violet.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/style/palette.dart';
 import 'package:violet/util/helper.dart';
@@ -105,6 +104,22 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
         ..addAll(_securityGroup())
         ..addAll(_databaseGroup())
         ..addAll([
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('작품 서버 주소'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('Pi 전체 백업·복원'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
+          ),
           ListTile(
             leading: const Icon(Icons.sync),
             title: const Text('앱·웹 기록 동기화'),
@@ -2045,132 +2060,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           title: Text(Translations.instance!.trans('restoringbookmark')),
           trailing: const Icon(Icons.keyboard_arrow_right),
           onTap: () async {
-            await showOkDialog(
+            await Navigator.of(
               context,
-              Translations.instance!.trans('restorebookmarkmsg'),
-              Translations.instance!.trans('warning'),
-            );
-
-            final prefs = await SharedPreferences.getInstance();
-            var myappid = prefs.getString('fa_userid');
-
-            // 1. 북마크 유저 아이디 선택
-            TextEditingController text = TextEditingController(text: myappid);
-            Widget okButton = TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Settings.majorColor.value,
-              ),
-              child: Text(Translations.instance!.trans('ok')),
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-            );
-            Widget cancelButton = TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Settings.majorColor.value,
-              ),
-              child: Text(Translations.instance!.trans('cancel')),
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-            );
-            var dialog = await showDialog(
-              useRootNavigator: false,
-              context: context,
-              builder: (BuildContext context) => AlertDialog(
-                contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                title: const Text('Enter User App Id'),
-                content: TextField(
-                  controller: text,
-                  autofocus: true,
-                  maxLines: 3,
-                ),
-                actions: [okButton, cancelButton],
-              ),
-            );
-            if (dialog == null || dialog == false) {
-              // await Settings.setDownloadRule(text.text);
-              return;
-            }
-
-            try {
-              // 2. 유효한 유저 아이디 인지 확인(서버 요청 및 다운로드)
-              var result = await VioletServer.restoreBookmark(text.text);
-              if (result == null) {
-                await showOkDialog(
-                  context,
-                  "Invalid User-App-Id! If you're still getting this error, contact the developer.",
-                  Translations.instance!.trans('restoringbookmark'),
-                );
-                return;
-              }
-
-              // 3. 북마크 버전 가져오기
-              var versions = await VioletServer.versionsBookmark(text.text);
-              if (versions == null) {
-                await showOkDialog(
-                  context,
-                  '북마크 버전 정보를 가져오는데 오류가 발생했습니다. UserAppId와 함께 개발자에게 문의하시기 바랍니다.',
-                  Translations.instance!.trans('restoringbookmark'),
-                );
-                return;
-              }
-
-              // 4. 버전 선택 및 북마크 확인 (이 북마크를 복원할까요?)
-              var version = await PlatformNavigator.navigateSlide(
-                context,
-                BookmarkVersionSelectPage(
-                  userAppId: text.text,
-                  versions: versions,
-                ),
-              );
-
-              if (version == null) {
-                return;
-              }
-
-              // 5. 열람기록도 같이 복원할까요?
-              var restoreWithRecord = await showYesNoDialog(
-                context,
-                '열람기록도 같이 복원할까요?',
-              );
-
-              // 6. 북마크 다운로드
-              var bookmark = await VioletServer.resotreBookmarkWithVersion(
-                text.text,
-                version,
-              );
-
-              // 7. 덮어쓰기 한다.
-              var rr = await showDialog(
-                context: context,
-                builder: (BuildContext context) => RestoreBookmarkPage(
-                  source: bookmark,
-                  restoreWithRecord: restoreWithRecord,
-                ),
-              );
-
-              if (rr != null && rr == false) {
-                return;
-              }
-            } catch (e, st) {
-              Logger.error(
-                '[Restore Bookmark] $e\n'
-                '$st',
-              );
-              showToast(
-                level: ToastLevel.error,
-                message: 'Bookmark Restoring Error!',
-              );
-              return;
-            }
-
-            await Bookmark.getInstance();
-
-            showToast(
-              level: ToastLevel.check,
-              message: Translations.instance!.trans('importbookmark'),
-            );
+            ).push(MaterialPageRoute(builder: (_) => const PiBackupPage()));
           },
         ),
         ListTile(

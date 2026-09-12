@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:convert';
+import 'package:violet/services/server_config.dart';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -17,9 +18,8 @@ import 'package:violet/server/wsalt.dart' as wsalt;
 import 'package:violet/settings/settings.dart';
 
 class VioletServer {
-  static const protocol = 'https';
-  static const host = '192.168.0.39:3001/api';
-  static const api = '$protocol://$host';
+  static String get api =>
+      ServerConfig.endpoint(ServerConfig.apiBase(ServerConfig.webBase), 'api');
 
   static Future<dynamic> top(int offset, int count, String type) async {
     final gg = await http.get(
@@ -285,13 +285,9 @@ class VioletServer {
     return false;
   }
 
-  static String? _userId;
   static Future<String> _getUserAppId() async {
-    if (_userId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      _userId = prefs.getString('fa_userid');
-    }
-    return _userId!;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('fa_userid') ?? '';
   }
 
   // https://koromo.cc/api/record/recent?count=10&limit=180

@@ -1,3 +1,4 @@
+import 'package:violet/pages/settings/pi_backup_page.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -7,9 +8,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/other/dialogs.dart';
-import 'package:violet/pages/common/toast.dart';
 import 'package:violet/server/community/session.dart';
-import 'package:violet/server/violet.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/widgets/theme_switchable_state.dart';
 
@@ -33,7 +32,6 @@ class _UserStatusCardState extends ThemeSwitchableState<UserStatusCard>
   String _userAppId = '';
   final String _userNickName = 'None';
   bool _logining = false;
-  DateTime _latestBackup = DateTime.now();
 
   @override
   void initState() {
@@ -237,51 +235,9 @@ class _UserStatusCardState extends ThemeSwitchableState<UserStatusCard>
                     ),
                   ),
                   onTap: () async {
-                    // if (Settings.autobackupBookmark.value) {
-                    //   await showOkDialog(
-                    //       context,
-                    //       'Bookmark Auto-Backup function is enabled. Each time you restart the app, ' +
-                    //           'your bookmarks are automatically backed up to Violet Server. If you want ' +
-                    //           'to back up manually, turn off automatic backup option.',
-                    //       'Bookmark Backup');
-                    //   return;
-                    // }
-
-                    if (DateTime.now()
-                            .difference(_latestBackup)
-                            .abs()
-                            .inMinutes >
-                        3) {
-                      await showOkDialog(
-                        context,
-                        'Please try again in a few minutes!',
-                        'Bookmark Backup',
-                      );
-                      return;
-                    }
-                    _latestBackup = DateTime.now();
-
-                    setState(() {
-                      _logining = true;
-                    });
-
-                    var resc = await VioletServer.uploadBookmark();
-
-                    setState(() {
-                      _logining = false;
-                    });
-
-                    if (resc) {
-                      showToast(
-                        level: ToastLevel.check,
-                        message: 'Bookmark Backup Success!',
-                      );
-                    } else {
-                      showToast(
-                        level: ToastLevel.error,
-                        message: 'Bookmark Backup Fail!',
-                      );
-                    }
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PiBackupPage()),
+                    );
                   },
                 ),
         ),

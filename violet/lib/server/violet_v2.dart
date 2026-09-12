@@ -22,13 +22,9 @@ class VioletServerV2 {
     );
   }
 
-  static String? _userId;
   static Future<String> _getUserAppId() async {
-    if (_userId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      _userId = prefs.getString('fa_userid');
-    }
-    return _userId!;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('fa_userid') ?? '';
   }
 
   static Future<void> view(int articleid) async {

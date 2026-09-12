@@ -9,6 +9,7 @@ services:
       - ./server.py:/app/server.py:ro
       - ./bookmark_sync.py:/app/bookmark_sync.py:ro
       - ./activity_sync.py:/app/activity_sync.py:ro
+      - ./backup_store.py:/app/backup_store.py:ro
       - ./export:/export
       - ./state:/state
       - content-db:/content-data
