@@ -1,3 +1,4 @@
+import 'dart:async';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -90,15 +91,13 @@ class ThumbnailWidget extends StatelessWidget {
   }
 }
 
-class ThumbnailImageWidget extends StatelessWidget {
+class ThumbnailImageWidget extends StatefulWidget {
   final String thumbnailTag;
   final String thumbnail;
   final Map<String, String> headers;
   final bool showUltra;
   final bool greyScale;
 
-  // https://github.com/Baseflow/flutter_cached_network_image/issues/468
-  final _rebuildValueNotifier = ValueNotifier('');
 
   ThumbnailImageWidget({
     super.key,
@@ -110,24 +109,50 @@ class ThumbnailImageWidget extends StatelessWidget {
   });
 
   @override
+  State<ThumbnailImageWidget> createState() => _ThumbnailImageWidgetState();
+}
+
+class _ThumbnailImageWidgetState extends State<ThumbnailImageWidget> {
+  final _rebuildValueNotifier = ValueNotifier('');
+  Timer? _retry;
+  int _retries = 0;
+
+  @override
+  void didUpdateWidget(ThumbnailImageWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.thumbnail != widget.thumbnail) {
+      _retry?.cancel();
+      _retry = null;
+      _retries = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _retry?.cancel();
+    _rebuildValueNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Hero(
-      tag: thumbnailTag,
+      tag: widget.thumbnailTag,
       child: ValueListenableBuilder<String>(
         valueListenable: _rebuildValueNotifier,
         builder: (context, value, child) {
           return CachedNetworkImage(
             key: value.isEmpty ? null : ValueKey(value),
-            memCacheWidth: Settings.useLowPerf.value ? 300 : null,
-            imageUrl: thumbnail,
+            memCacheWidth: Settings.useLowPerf.value ? 300 : (widget.showUltra ? 360 : 600),
+            imageUrl: widget.thumbnail,
             fit: BoxFit.cover,
-            httpHeaders: headers,
+            httpHeaders: widget.headers,
             imageBuilder: (context, imageProvider) => Container(
               decoration: BoxDecoration(
                 image: DecorationImage(
                   image: imageProvider,
-                  fit: !showUltra ? BoxFit.cover : BoxFit.contain,
-                  colorFilter: greyScale
+                  fit: !widget.showUltra ? BoxFit.cover : BoxFit.contain,
+                  colorFilter: widget.greyScale
                       ? ColorFilter.mode(
                           Settings.themeWhat.value
                               ? Colors.grey.shade800
@@ -140,9 +165,15 @@ class ThumbnailImageWidget extends StatelessWidget {
               child: Container(),
             ),
             errorWidget: (context, url, error) {
-              Future.delayed(const Duration(milliseconds: 300)).then(
-                (value) => _rebuildValueNotifier.value = const Uuid().v1(),
-              );
+              if (_retry == null && _retries < 2) {
+                _retry = Timer(const Duration(seconds: 1), () {
+                  _retry = null;
+                  if (!mounted) return;
+                  _retries++;
+                  _rebuildValueNotifier.value = const Uuid().v1();
+                });
+              }
+              if (_retries >= 2) return const Center(child: Icon(Icons.broken_image_outlined));
               return Center(
                 child: SizedBox(
                   width: 30,

@@ -30,11 +30,34 @@ class ActivitySync {
     )).map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
-  static List<String> downloadedOrigins(String article) => records.value
-      .where((r) => r['Kind'] == 'download' && r['Article'] == article)
-      .map((r) => r['Origin'] as String)
-      .toSet()
-      .toList();
+  static List<Map<String, dynamic>>? _indexedSource;
+  static final _downloads = <String, Set<String>>{};
+  static final _reads = <String, Map<String, dynamic>>{};
+  static void _ensureIndex() {
+    if (identical(_indexedSource, records.value)) return;
+    _downloads.clear();
+    _reads.clear();
+    for (final row in records.value) {
+      final article = row['Article'] as String;
+      if (row['Kind'] == 'download') {
+        (_downloads[article] ??= <String>{}).add(row['Origin'] as String);
+      } else if (row['Kind'] == 'read' &&
+          (row['Timestamp'] as int) > (_reads[article]?['Timestamp'] as int? ?? 0)) {
+        _reads[article] = row;
+      }
+    }
+    _indexedSource = records.value;
+  }
+
+  static Map<String, dynamic>? latestRead(String article) {
+    _ensureIndex();
+    return _reads[article];
+  }
+
+  static List<String> downloadedOrigins(String article) {
+    _ensureIndex();
+    return _downloads[article]?.toList() ?? [];
+  }
 
   static int timeOf(Object? value) =>
       DateTime.tryParse(

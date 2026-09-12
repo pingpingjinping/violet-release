@@ -42,9 +42,7 @@ class _SharedActivityBadgeState extends State<SharedActivityBadge> {
     valueListenable: ActivitySync.records,
     builder: (context, rows, _) {
       final origins = ActivitySync.downloadedOrigins(widget.article);
-      final read = rows
-          .where((r) => r['Kind'] == 'read' && r['Article'] == widget.article)
-          .firstOrNull;
+      final read = ActivitySync.latestRead(widget.article);
       final labels = <String>[
         if (origins.contains('app')) '앱에서 다운로드함',
         if (origins.contains('web')) '웹에서 다운로드함',

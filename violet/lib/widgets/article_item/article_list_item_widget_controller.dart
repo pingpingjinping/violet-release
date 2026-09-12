@@ -92,24 +92,12 @@ class ArticleListItemWidgetController extends GetxController {
     });
   }
 
-  checkLastRead() {
-    User.getInstance().then(
-      (value) => value.getUserLog().then((value) async {
-        var x = value.where(
-          (e) =>
-              e.articleId() == articleListItem.queryResult.id().toString() &&
-              e.lastPage() != null &&
-              e.lastPage()! > 1 &&
-              DateTime.parse(
-                    e.datetimeStart(),
-                  ).difference(DateTime.now()).inDays <
-                  31,
-        );
-        if (x.isEmpty) return;
-        isLatestRead.value = true;
-        latestReadPage.value = x.first.lastPage()!;
-      }),
-    );
+  checkLastRead() async {
+    final user = await User.getInstance();
+    final log = await user.recentRead(articleListItem.queryResult.id().toString());
+    if (disposed || log == null) return;
+    isLatestRead.value = true;
+    latestReadPage.value = log.lastPage()!;
   }
 
   initTexts() {
