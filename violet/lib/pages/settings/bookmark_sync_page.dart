@@ -88,31 +88,37 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('앱 시작 시 DB 자동 갱신'),
-          subtitle: const Text('앱을 완전히 종료했다 켤 때 확인합니다. 변경 시 적용을 마친 뒤 검색 화면으로 이동합니다.'),
+          subtitle: const Text(
+            '앱을 완전히 종료했다 켤 때 확인합니다. 변경 시 적용을 마친 뒤 검색 화면으로 이동합니다.',
+          ),
           value: _autoContent,
-          onChanged: !_loaded || _busy ? null : (value) async {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('auto_content_db_update', value);
-            if (mounted) setState(() => _autoContent = value);
-          },
+          onChanged: !_loaded || _busy
+              ? null
+              : (value) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('auto_content_db_update', value);
+                  if (mounted) setState(() => _autoContent = value);
+                },
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('기록 자동 동기화'),
           subtitle: const Text('꺼도 기존 기록은 유지되며, 지금 동기화 버튼으로 직접 실행할 수 있습니다.'),
           value: _autoRecords,
-          onChanged: !_loaded || _busy ? null : (value) async {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('auto_record_sync', value);
-            if (mounted) setState(() => _autoRecords = value);
-          },
+          onChanged: !_loaded || _busy
+              ? null
+              : (value) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('auto_record_sync', value);
+                  if (mounted) setState(() => _autoRecords = value);
+                },
         ),
         ValueListenableBuilder<bool>(
           valueListenable: SharedActivityBadge.visible,
           builder: (context, visible, _) => SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('작품 카드에 읽음·다운로드 기록 표시'),
-            subtitle: const Text('꺼도 기록 동기화는 계속됩니다.'),
+            subtitle: const Text('표시만 숨기며 저장된 기록은 유지됩니다.'),
             value: visible,
             onChanged: _loaded && !_busy
                 ? (value) async {

@@ -98,7 +98,6 @@ class ThumbnailImageWidget extends StatefulWidget {
   final bool showUltra;
   final bool greyScale;
 
-
   ThumbnailImageWidget({
     super.key,
     required this.thumbnail,
@@ -143,7 +142,9 @@ class _ThumbnailImageWidgetState extends State<ThumbnailImageWidget> {
         builder: (context, value, child) {
           return CachedNetworkImage(
             key: value.isEmpty ? null : ValueKey(value),
-            memCacheWidth: Settings.useLowPerf.value ? 300 : (widget.showUltra ? 360 : 600),
+            memCacheWidth: Settings.useLowPerf.value
+                ? 300
+                : (widget.showUltra ? 360 : 600),
             imageUrl: widget.thumbnail,
             fit: BoxFit.cover,
             httpHeaders: widget.headers,
@@ -173,7 +174,8 @@ class _ThumbnailImageWidgetState extends State<ThumbnailImageWidget> {
                   _rebuildValueNotifier.value = const Uuid().v1();
                 });
               }
-              if (_retries >= 2) return const Center(child: Icon(Icons.broken_image_outlined));
+              if (_retries >= 2)
+                return const Center(child: Icon(Icons.broken_image_outlined));
               return Center(
                 child: SizedBox(
                   width: 30,

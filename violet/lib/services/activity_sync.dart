@@ -42,7 +42,8 @@ class ActivitySync {
       if (row['Kind'] == 'download') {
         (_downloads[article] ??= <String>{}).add(row['Origin'] as String);
       } else if (row['Kind'] == 'read' &&
-          (row['Timestamp'] as int) > (_reads[article]?['Timestamp'] as int? ?? 0)) {
+          (row['Timestamp'] as int) >
+              (_reads[article]?['Timestamp'] as int? ?? 0)) {
         _reads[article] = row;
       }
     }

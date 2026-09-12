@@ -97,7 +97,8 @@ class User {
     final log = _recentByArticle[article];
     if (log == null) return null;
     final start = DateTime.tryParse(log.datetimeStart());
-    if (start == null || DateTime.now().difference(start).inDays >= 31) return null;
+    if (start == null || DateTime.now().difference(start).inDays >= 31)
+      return null;
     return log;
   }
 
@@ -114,11 +115,13 @@ class User {
     });
     await ActivitySync.load();
     final shared = ActivitySync.records.value;
-    if (_mergedReadLog != null && identical(_sharedSource, shared)) return _mergedReadLog!;
+    if (_mergedReadLog != null && identical(_sharedSource, shared))
+      return _mergedReadLog!;
     final combined = mergeReadLogs(cachedReadLog!, shared);
     _recentByArticle.clear();
     for (final log in combined) {
-      if ((log.lastPage() ?? 0) > 1) _recentByArticle.putIfAbsent(log.articleId(), () => log);
+      if ((log.lastPage() ?? 0) > 1)
+        _recentByArticle.putIfAbsent(log.articleId(), () => log);
     }
     _sharedSource = shared;
     return _mergedReadLog = combined;
@@ -155,47 +158,49 @@ class User {
   }
 }
 
-List<ArticleReadLog> mergeReadLogs(List<ArticleReadLog> local, List<Map<String, dynamic>> shared) {
-    final localLatest = <String, int>{};
-    for (final log in local) {
-      final time = ActivitySync.timeOf(
-        log.datetimeEnd() ?? log.datetimeStart(),
-      );
-      if ((localLatest[log.articleId()] ?? 0) < time)
-        localLatest[log.articleId()] = time;
-    }
-    final sharedLatest = <String, Map<String, dynamic>>{};
-    for (final r in shared.where(
-      (r) => r['Kind'] == 'read',
-    )) {
-      final article = r['Article'] as String;
-      if ((r['Timestamp'] as int) <= (localLatest[article] ?? 0)) continue;
-      if ((sharedLatest[article]?['Timestamp'] as int? ?? 0) < (r['Timestamp'] as int)) sharedLatest[article] = r;
-    }
-    var remoteId = -1;
-    final combined = <ArticleReadLog>[
-      ...local,
-      for (final r in sharedLatest.values)
-        ArticleReadLog(
-          result: {
-            'Id': remoteId--,
-            'Article': r['Article'],
-            'Type': r['Type'],
-            'DateTimeStart': DateTime.fromMillisecondsSinceEpoch(
-              r['Timestamp'] as int,
-              isUtc: true,
-            ).toIso8601String(),
-            'DateTimeEnd': DateTime.fromMillisecondsSinceEpoch(
-              r['Timestamp'] as int,
-              isUtc: true,
-            ).toIso8601String(),
-            'LastPage': (r['Page'] as int) + 1,
-          },
-        ),
-    ];
-    final times = {for (final log in combined) log: ActivitySync.timeOf(log.datetimeEnd() ?? log.datetimeStart())};
-    combined.sort(
-      (a, b) => times[b]!.compareTo(times[a]!),
-    );
-    return combined;
+List<ArticleReadLog> mergeReadLogs(
+  List<ArticleReadLog> local,
+  List<Map<String, dynamic>> shared,
+) {
+  final localLatest = <String, int>{};
+  for (final log in local) {
+    final time = ActivitySync.timeOf(log.datetimeEnd() ?? log.datetimeStart());
+    if ((localLatest[log.articleId()] ?? 0) < time)
+      localLatest[log.articleId()] = time;
+  }
+  final sharedLatest = <String, Map<String, dynamic>>{};
+  for (final r in shared.where((r) => r['Kind'] == 'read')) {
+    final article = r['Article'] as String;
+    if ((r['Timestamp'] as int) <= (localLatest[article] ?? 0)) continue;
+    if ((sharedLatest[article]?['Timestamp'] as int? ?? 0) <
+        (r['Timestamp'] as int))
+      sharedLatest[article] = r;
+  }
+  var remoteId = -1;
+  final combined = <ArticleReadLog>[
+    ...local,
+    for (final r in sharedLatest.values)
+      ArticleReadLog(
+        result: {
+          'Id': remoteId--,
+          'Article': r['Article'],
+          'Type': r['Type'],
+          'DateTimeStart': DateTime.fromMillisecondsSinceEpoch(
+            r['Timestamp'] as int,
+            isUtc: true,
+          ).toIso8601String(),
+          'DateTimeEnd': DateTime.fromMillisecondsSinceEpoch(
+            r['Timestamp'] as int,
+            isUtc: true,
+          ).toIso8601String(),
+          'LastPage': (r['Page'] as int) + 1,
+        },
+      ),
+  ];
+  final times = {
+    for (final log in combined)
+      log: ActivitySync.timeOf(log.datetimeEnd() ?? log.datetimeStart()),
+  };
+  combined.sort((a, b) => times[b]!.compareTo(times[a]!));
+  return combined;
 }

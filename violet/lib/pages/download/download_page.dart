@@ -125,7 +125,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       await _autoRecoveryFileName();
       await _buildQueryResults();
       _applyFilter();
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
@@ -430,8 +430,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       } else {
         return SliverList(
           key: _listKey,
-          delegate: SliverChildListDelegate(
-            filterResult.reversed.map((e) {
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final e = filterResult[filterResult.length - 1 - index];
               if (!downloadItemWidgetKeys3.containsKey(e.id())) {
                 downloadItemWidgetKeys3[e.id()] =
                     GlobalKey<DownloadItemWidgetState>();
@@ -455,7 +456,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                   longPressCallback: () => longpress(e.id()),
                 ),
               );
-            }).toList(),
+            },
+            childCount: filterResult.length,
           ),
         );
       }

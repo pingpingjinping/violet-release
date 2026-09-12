@@ -97,8 +97,10 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
       //  Title based article clustering
       //
       if (!mounted) return;
-      series = await compute(HitomiTitleCluster.doClustering,
-        cc.map((e) => e.title() as String).toList());
+      series = await compute(
+        HitomiTitleCluster.doClustering,
+        cc.map((e) => e.title() as String).toList(),
+      );
       if (!mounted) return;
 
       //
@@ -140,19 +142,34 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
       //
       switch (widget.type) {
         case ArtistType.artist:
-          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (HentaiIndex.tagArtist, widget.name));
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagArtist,
+            widget.name,
+          ));
           break;
         case ArtistType.group:
-          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (HentaiIndex.tagGroup, widget.name));
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagGroup,
+            widget.name,
+          ));
           break;
         case ArtistType.uploader:
-          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (HentaiIndex.tagUploader, widget.name));
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagUploader,
+            widget.name,
+          ));
           break;
         case ArtistType.series:
-          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (HentaiIndex.tagSeries, widget.name));
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagSeries,
+            widget.name,
+          ));
           break;
         case ArtistType.character:
-          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (HentaiIndex.tagCharacter, widget.name));
+          similars = await compute(HentaiIndex.calculateSimilarsInWorker, (
+            HentaiIndex.tagCharacter,
+            widget.name,
+          ));
           break;
       }
 

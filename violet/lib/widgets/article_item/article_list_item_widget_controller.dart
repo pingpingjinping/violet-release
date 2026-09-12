@@ -94,7 +94,9 @@ class ArticleListItemWidgetController extends GetxController {
 
   checkLastRead() async {
     final user = await User.getInstance();
-    final log = await user.recentRead(articleListItem.queryResult.id().toString());
+    final log = await user.recentRead(
+      articleListItem.queryResult.id().toString(),
+    );
     if (disposed || log == null) return;
     isLatestRead.value = true;
     latestReadPage.value = log.lastPage()!;

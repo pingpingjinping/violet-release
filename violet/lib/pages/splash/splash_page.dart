@@ -310,17 +310,25 @@ class _SplashPageState extends State<SplashPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(_contentStage!, style: const TextStyle(
-                            color: Colors.white, fontSize: 20)),
+                          Text(
+                            _contentStage!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
+                          ),
                           const SizedBox(height: 24),
                           LinearProgressIndicator(
                             value: _contentTotal > 0
-                                ? _contentReceived / _contentTotal : null,
+                                ? _contentReceived / _contentTotal
+                                : null,
                           ),
                           if (_contentTotal > 0) ...[
                             const SizedBox(height: 12),
-                            Text('${(_contentReceived / _contentTotal * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(color: Colors.white)),
+                            Text(
+                              '${(_contentReceived / _contentTotal * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(color: Colors.white),
+                            ),
                           ],
                         ],
                       ),

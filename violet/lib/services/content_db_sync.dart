@@ -60,8 +60,11 @@ class ContentDbSync {
         download = Uri.tryParse('${fields[2]}-korean.db');
         break;
       }
-      if (version == null || version <= 0 || download == null ||
-          !['http', 'https'].contains(download.scheme)) return false;
+      if (version == null ||
+          version <= 0 ||
+          download == null ||
+          !['http', 'https'].contains(download.scheme))
+        return false;
       if ((prefs.getInt('content-snapshot-version') ??
               prefs.getInt('synclatest')) ==
           version) {
@@ -73,23 +76,35 @@ class ContentDbSync {
       temporary = File('${destination.path}.updating');
       onProgress?.call('DB 다운로드 중', 0, 0);
       var lastProgress = 0;
-      await Dio(BaseOptions(receiveTimeout: const Duration(minutes: 2)))
-          .download(download.toString(), temporary.path,
-            onReceiveProgress: (received, total) {
-              final now = DateTime.now().millisecondsSinceEpoch;
-              if (now - lastProgress >= 100 || received == total) {
-                lastProgress = now;
-                onProgress?.call('DB 다운로드 중', received, total);
-              }
-            });
+      await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+      ).download(
+        download.toString(),
+        temporary.path,
+        onReceiveProgress: (received, total) {
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastProgress >= 100 || received == total) {
+            lastProgress = now;
+            onProgress?.call('DB 다운로드 중', received, total);
+          }
+        },
+      );
       onProgress?.call('DB 검사 중', 0, 0);
-      final candidate = await openDatabase(temporary.path,
-          readOnly: true, singleInstance: false);
+      final candidate = await openDatabase(
+        temporary.path,
+        readOnly: true,
+        singleInstance: false,
+      );
       try {
         final check = await candidate.rawQuery('PRAGMA quick_check');
         final count = await candidate.rawQuery(
-            'SELECT COUNT(*) AS count FROM HitomiColumnModel');
-        if (check.isEmpty || check.first.values.first != 'ok' ||
+          'SELECT COUNT(*) AS count FROM HitomiColumnModel',
+        );
+        if (check.isEmpty ||
+            check.first.values.first != 'ok' ||
             (count.first['count'] as int) == 0) {
           throw StateError('Invalid content snapshot');
         }
@@ -116,16 +131,22 @@ class ContentDbSync {
       await manager.checkOpen();
       await prefs.setInt('content-snapshot-version', version);
       await prefs.setInt('synclatest', version);
-      await prefs.setString('databasesync',
-        DateTime.fromMillisecondsSinceEpoch(version * 1000).toString());
+      await prefs.setString(
+        'databasesync',
+        DateTime.fromMillisecondsSinceEpoch(version * 1000).toString(),
+      );
       return true;
     } catch (error) {
       Logger.error('[ContentDbSync] Update failed; retry on next launch');
       return false;
     } finally {
       client.close();
-      if (temporary != null && await temporary.exists()) {
-        await temporary.delete();
+      try {
+        if (temporary != null && await temporary.exists()) {
+          await temporary.delete();
+        }
+      } catch (_) {
+        Logger.error('[ContentDbSync] Could not remove temporary snapshot');
       }
     }
   }
