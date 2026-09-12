@@ -18,13 +18,11 @@ jobs:
           flutter-version: '3.35.4'
           cache: true
 
-      - name: Set up Rust & iOS Targets
+      - name: Fix Rustup and Install iOS Targets
         run: |
+          mkdir -p ~/.rustup/downloads
           rustup default stable
-          rustup update
-          rustup target add aarch64-apple-ios --force || true
-          rustup target add aarch64-apple-ios-sim --force || true
-          rustup target add x86_64-apple-ios --force || true
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
       - name: Install Flutter dependencies
         working-directory: violet
