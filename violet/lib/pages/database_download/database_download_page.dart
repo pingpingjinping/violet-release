@@ -166,7 +166,7 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       );
       if (widget.dbType! == 'global') {
         await dio.download(
-          SyncManager.getLatestDB().getDBDownloadUrl(widget.dbType!),
+          SyncManager.getLatestDB().getDBDownloadUrliOS('ko'),
           '${dir.path}/db.sql.7z',
           onReceiveProgress: (rec, total) {
             nu += rec - latest;
@@ -204,12 +204,41 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
         await Settings.useChunkSync.setValue(false);
       }
       if (widget.dbType! == 'global') {
-        await decompress7Z(
-          src: '${dir.path}/db.sql.7z',
-          dest: Platform.isAndroid ? '${dir.path}/data' : dir.path,
-        );
-        await File('${dir.path}/db.sql.7z').delete();
-        await Settings.useChunkSync.setValue(true);
+        final downloadedPath = '${dir.path}/db.sql.7z';
+
+final downloadedDb = await openDatabase(
+  downloadedPath,
+  readOnly: true,
+  singleInstance: false,
+);
+
+try {
+  final check = await downloadedDb.rawQuery('PRAGMA quick_check');
+  if (check.isEmpty || check.first.values.first != 'ok') {
+    throw Exception('Downloaded database failed validation');
+  }
+
+  final rows = await downloadedDb.rawQuery(
+    'SELECT COUNT(*) AS count FROM HitomiColumnModel',
+  );
+  if ((rows.first['count'] as int) == 0) {
+    throw Exception('Downloaded database contains no articles');
+  }
+} finally {
+  await downloadedDb.close();
+}
+
+await DataBaseManager.reloadInstance();
+
+final destinationPath = Platform.isAndroid
+    ? '${dir.path}/data/data.db'
+    : '${await getDatabasesPath()}/data.db';
+
+await Directory(dirname(destinationPath)).create(recursive: true);
+await File(downloadedPath).rename(destinationPath);
+
+// This server provides complete Korean snapshots, not incremental chunks.
+await Settings.useChunkSync.setValue(false);
       }
 
       final prefs = await SharedPreferences.getInstance();

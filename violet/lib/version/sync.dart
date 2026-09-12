@@ -43,7 +43,7 @@ class SyncInfoRecord {
 
 class SyncManager {
   static String syncInfoURL(String branch) {
-    return 'https://raw.githubusercontent.com/TaYaKi71751/sync-data/$branch/syncversion.txt';
+    return 'http://192.168.0.39:3002/syncversion.txt';
   }
 
   static bool firstSync = false;
