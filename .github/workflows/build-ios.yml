@@ -43,6 +43,23 @@ jobs:
             aarch64-apple-ios-sim \
             x86_64-apple-ios
 
+      - name: Prepare fallback salt files
+        working-directory: violet
+        run: |
+          mkdir -p lib/server
+
+          if [ ! -f lib/server/salt.dart ]; then
+            printf '%s\n' \
+              'String getValid(String vToken) { return vToken; }' \
+              > lib/server/salt.dart
+          fi
+
+          if [ ! -f lib/server/wsalt.dart ]; then
+            printf '%s\n' \
+              'String getValid(String vToken) { return vToken; }' \
+              > lib/server/wsalt.dart
+          fi
+
       - name: Prepare Flutter and CocoaPods
         working-directory: violet
         run: |
@@ -81,7 +98,7 @@ jobs:
           ditto "$APP_DIR" build/ipa/Payload/Runner.app
 
           cd build/ipa
-          zip -r "$GITHUB_WORKSPACE/violet.ipa" Payload
+          zip -r -y "$GITHUB_WORKSPACE/violet.ipa" Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
