@@ -1,3 +1,4 @@
+import { syncActivity } from './activity-sync';
 import { getGroups, getBookmarkArticles } from '../api/bookmarks';
 import { transactBookmarkSync } from './user-database';
 
@@ -29,6 +30,11 @@ function ids(articles: Array<{ Article: string }>) {
 }
 
 export async function syncBookmarks(force = false): Promise<number | null> {
+  const count = await syncArticleBookmarks(force);
+  await syncActivity(force);
+  return count;
+}
+async function syncArticleBookmarks(force: boolean): Promise<number | null> {
   const config = getBookmarkSyncConfig();
   if (!config.token) return null;
   await getGroups();

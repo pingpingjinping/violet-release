@@ -7,6 +7,8 @@ import {
   deleteUserItem,
 } from '../services/user-database';
 
+import { getSharedActivity } from '../services/activity-sync';
+
 const HISTORY_KEY = 'violet-web:read-history';
 
 export interface HistoryResponse {
@@ -47,16 +49,23 @@ async function readHistory(): Promise<ArticleReadLog[]> {
   return getAllUserItems<ArticleReadLog>(USER_STORES.readHistory);
 }
 
+export async function getLocalHistory() { return readHistory(); }
 async function getLatestLogsByArticle() {
   const latest = new Map<string, ArticleReadLog>();
 
-  for (const log of (await readHistory()).sort((a, b) => b.Id - a.Id)) {
+  const local = await readHistory();
+  const remote: ArticleReadLog[] = (await getSharedActivity()).filter(r => r.kind === 'read').map((r, index) => ({
+    Id: -index - 1, Article: r.article, DateTimeStart: new Date(r.timestamp).toISOString(),
+    DateTimeEnd: new Date(r.timestamp).toISOString(), LastPage: r.page, Type: r.type,
+  }));
+  const time = (r: ArticleReadLog) => Date.parse(r.DateTimeEnd ?? r.DateTimeStart) || 0;
+  for (const log of [...local, ...remote].sort((a, b) => time(b) - time(a))) {
     if (!latest.has(log.Article)) {
       latest.set(log.Article, log);
     }
   }
 
-  return Array.from(latest.values()).sort((a, b) => b.Id - a.Id);
+  return Array.from(latest.values()).sort((a, b) => time(b) - time(a));
 }
 
 function nextId(logs: ArticleReadLog[]) {
@@ -111,3 +120,4 @@ export async function deleteReadLog(id: number): Promise<void> {
   await ensureMigrated();
   await deleteUserItem(USER_STORES.readHistory, id);
 }
+

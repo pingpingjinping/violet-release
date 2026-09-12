@@ -4,6 +4,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+import 'package:violet/pages/settings/shared_activity_page.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -251,6 +252,18 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                   delegate: AnimatedOpacitySliver(
                     searchBar: Stack(
                       children: <Widget>[_urlBar(), _features(), _align()],
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.sync),
+                    label: const Text('앱·웹 공유 다운로드 기록'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SharedActivityPage(),
+                      ),
                     ),
                   ),
                 ),

@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:collection';
+import 'package:violet/services/activity_sync.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -32,10 +33,13 @@ class RecordViewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    return CardPanel.build(
-      context,
-      child: future(context, width),
-      enableBackgroundColor: true,
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: ActivitySync.records,
+      builder: (context, _, __) => CardPanel.build(
+        context,
+        child: future(context, width),
+        enableBackgroundColor: true,
+      ),
     );
   }
 

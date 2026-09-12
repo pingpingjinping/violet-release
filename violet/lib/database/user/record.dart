@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'package:synchronized/synchronized.dart';
+import 'package:violet/services/activity_sync.dart';
 import 'package:violet/database/user/user.dart';
 import 'package:violet/log/log.dart';
 
@@ -98,7 +99,50 @@ class User {
               .map((x) => ArticleReadLog(result: x))
               .toList();
     });
-    return cachedReadLog!;
+    await ActivitySync.load();
+    final localLatest = <String, int>{};
+    for (final log in cachedReadLog!) {
+      final time = ActivitySync.timeOf(
+        log.datetimeEnd() ?? log.datetimeStart(),
+      );
+      if ((localLatest[log.articleId()] ?? 0) < time)
+        localLatest[log.articleId()] = time;
+    }
+    final sharedLatest = <String, Map<String, dynamic>>{};
+    for (final r in ActivitySync.records.value.where(
+      (r) => r['Kind'] == 'read',
+    )) {
+      final article = r['Article'] as String;
+      if ((r['Timestamp'] as int) <= (localLatest[article] ?? 0)) continue;
+      sharedLatest.putIfAbsent(article, () => r);
+    }
+    var remoteId = -1;
+    final combined = <ArticleReadLog>[
+      ...cachedReadLog!,
+      for (final r in sharedLatest.values)
+        ArticleReadLog(
+          result: {
+            'Id': remoteId--,
+            'Article': r['Article'],
+            'Type': r['Type'],
+            'DateTimeStart': DateTime.fromMillisecondsSinceEpoch(
+              r['Timestamp'] as int,
+              isUtc: true,
+            ).toIso8601String(),
+            'DateTimeEnd': DateTime.fromMillisecondsSinceEpoch(
+              r['Timestamp'] as int,
+              isUtc: true,
+            ).toIso8601String(),
+            'LastPage': (r['Page'] as int) + 1,
+          },
+        ),
+    ];
+    combined.sort(
+      (a, b) => ActivitySync.timeOf(
+        b.datetimeEnd() ?? b.datetimeStart(),
+      ).compareTo(ActivitySync.timeOf(a.datetimeEnd() ?? a.datetimeStart())),
+    );
+    return combined;
   }
 
   Future<void> insertUserLog(

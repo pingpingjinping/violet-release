@@ -23,11 +23,18 @@ export function App() {
       void queryClient.invalidateQueries({ queryKey: ['isBookmarked'] });
       void queryClient.invalidateQueries({ queryKey: ['allArticles'] });
     };
+    const refreshActivity = () => {
+      for (const key of ['sharedActivity', 'readHistory', 'readHistory-infinite', 'downloads', 'downloads-infinite', 'downloaded']) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    };
+    window.addEventListener('violet-activity-synced', refreshActivity);
     window.addEventListener('violet-bookmarks-synced', refresh);
     document.addEventListener('visibilitychange', sync);
     window.addEventListener('focus', sync);
     sync();
     return () => {
+      window.removeEventListener('violet-activity-synced', refreshActivity);
       window.removeEventListener('violet-bookmarks-synced', refresh);
       document.removeEventListener('visibilitychange', sync);
       window.removeEventListener('focus', sync);

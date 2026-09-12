@@ -7,10 +7,11 @@ mkdir -p "$task_backup_dir" mobile-db
 task_download_dir=$(mktemp -d)
 trap 'rm -rf "$task_download_dir"' EXIT
 
-task_ref="${VIOLET_SYNC_REF:-codex/bookmark-sync}"
+task_ref="${VIOLET_SYNC_REF:-dev}"
 task_base="https://raw.githubusercontent.com/pingpingjinping/violet-release/$task_ref"
 task_paths='mobile-db/server.py
 mobile-db/bookmark_sync.py
+mobile-db/activity_sync.py
 mobile-db/compose.yml
 mobile-db/.gitignore
 violet-web/packages/frontend/src/services/user-database.ts
@@ -21,7 +22,16 @@ violet-web/packages/frontend/src/pages/SettingsPage.tsx
 violet-web/packages/frontend/src/i18n/locales/en.json
 violet-web/packages/frontend/src/i18n/locales/ko.json
 violet-web/packages/frontend/src/i18n/locales/ja.json
-violet-web/packages/frontend/src/i18n/locales/zh.json'
+violet-web/packages/frontend/src/i18n/locales/zh.json
+violet-web/packages/frontend/src/services/activity-sync.ts
+violet-web/packages/frontend/src/hooks/useSharedActivity.ts
+violet-web/packages/frontend/src/api/history.ts
+violet-web/packages/frontend/src/api/downloads.ts
+violet-web/packages/frontend/src/hooks/useDownloads.ts
+violet-web/packages/frontend/src/components/search/ArticleCard.tsx
+violet-web/packages/frontend/src/pages/ArticlePage.tsx
+violet-web/packages/frontend/src/pages/DownloadsPage.tsx
+violet-web/packages/frontend/src/pages/ViewerPage.tsx'
 
 # Complete all downloads before changing the running installation.
 printf '%s\n' "$task_paths" | while IFS= read -r task_path; do

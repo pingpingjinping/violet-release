@@ -1,3 +1,4 @@
+import { useArticleActivity } from '../hooks/useSharedActivity';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +15,7 @@ export function ArticlePage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { downloads: sharedDownloads, read: sharedRead } = useArticleActivity(id!);
   const articleId = parseInt(id!);
   const { data: article, isLoading } = useArticle(articleId);
   const { data: isBookmarked } = useIsBookmarked(id!);
@@ -39,6 +41,10 @@ export function ArticlePage() {
         )}
         <div className={styles.details}>
           <h1 className={styles.title}>{article.Title}</h1>
+          <div style={{ color: 'var(--color-text-secondary)' }}>
+            {[...new Set(sharedDownloads.map(r => r.origin))].map(origin => t('activity.downloaded', { source: t(`activity.${origin}`) })).join(' / ')}
+            {sharedRead && ` · ${t('activity.read', { page: sharedRead.page + 1 })}`}
+          </div>
           <div className={styles.meta}>
             {artists.length > 0 && (
               <div className={styles.field}>
@@ -116,3 +122,4 @@ export function ArticlePage() {
     </div>
   );
 }
+

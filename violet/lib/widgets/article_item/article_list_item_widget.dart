@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:async';
+import 'package:violet/widgets/shared_activity_badge.dart';
 
 import 'package:extended_wrap/extended_wrap.dart';
 import 'package:flutter/material.dart';
@@ -190,7 +191,17 @@ class _ArticleListItemWidgetState extends State<ArticleListItemWidget>
       );
     }
 
-    return _cachedBuildWidget!;
+    return Stack(
+      children: [
+        _cachedBuildWidget!,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SharedActivityBadge(article: data.queryResult.id().toString()),
+        ),
+      ],
+    );
   }
 
   _doBookmarkScaling() {

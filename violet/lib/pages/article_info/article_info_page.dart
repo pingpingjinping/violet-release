@@ -26,6 +26,7 @@ import 'package:violet/context/modal_bottom_sheet_context.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/database/user/bookmark.dart';
 import 'package:violet/database/user/download.dart';
+import 'package:violet/services/activity_sync.dart';
 import 'package:violet/database/user/record.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
@@ -340,14 +341,19 @@ class ArticleInfoPage extends StatelessWidget {
       return;
     }
 
-    if ((await Download.getInstance()).isDownloadedArticle(
+    await ActivitySync.load();
+    final localDownload = (await Download.getInstance()).isDownloadedArticle(
       data.queryResult.id(),
       false,
-    )) {
-      if (await showYesNoDialog(context, '이미 다운로드된 작품입니다. 그래도 다운로드할까요?') !=
-          true) {
-        return;
-      }
+    );
+    final webDownload = ActivitySync.downloadedOrigins(
+      data.queryResult.id().toString(),
+    ).contains('web');
+    if (localDownload || webDownload) {
+      final message = webDownload
+          ? '웹에서 다운로드한 기록이 있습니다. 이 기기에서도 다운로드할까요?'
+          : '이미 다운로드된 작품입니다. 그래도 다운로드할까요?';
+      if (await showYesNoDialog(context, message) != true) return;
     }
 
     showToast(

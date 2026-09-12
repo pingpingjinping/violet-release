@@ -9,7 +9,8 @@ import { ViewerContainer } from '../components/viewer/ViewerContainer';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { getProxyImageUrl } from '../api/proxy';
 import { cleanupExpired } from '../services/image-cache';
-import { useEffect, useRef } from 'react';
+import { getHistory } from '../api/history';
+import { useEffect, useState } from 'react';
 
 export function ViewerPage() {
   const { t } = useTranslation();
@@ -27,7 +28,7 @@ export function ViewerPage() {
 
   const insertLog = useInsertReadLog();
   const updateLog = useUpdateReadLog();
-  const logIdRef = useRef<number | null>(null);
+  const [logId, setLogId] = useState<number | null>(null);
   const { imageCacheEnabled, imageCacheExpireDays } = useAppStore();
 
   // Cleanup expired cache on mount
@@ -55,26 +56,34 @@ export function ViewerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate]);
 
-  // Insert read log on mount
+  // Read the previous session before creating this session's local log.
   useEffect(() => {
-    if (!galleryId) return;
-    insertLog.mutate(
-      { Article: String(galleryId), Type: 0 },
-      {
-        onSuccess: (data) => {
-          logIdRef.current = Number(data.Id);
-        },
-      },
-    );
+    if (!galleryId || totalPages <= 0) return;
+    let cancelled = false;
+    setLogId(null);
+    const open = async () => {
+      if (!searchParams.has('page')) {
+        const previous = (await getHistory(0, 100000)).logs.find(r => r.Article === String(galleryId));
+        if (cancelled) return;
+        if (previous && previous.LastPage > 0 && window.confirm(t('activity.resumeConfirm', { page: previous.LastPage + 1 }))) {
+          goToPage(Math.min(previous.LastPage, totalPages - 1));
+        }
+      }
+      if (cancelled) return;
+      const data = await insertLog.mutateAsync({ Article: String(galleryId), Type: 0 });
+      if (!cancelled) setLogId(Number(data.Id));
+    };
+    void open().catch(() => {});
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryId]);
+  }, [galleryId, totalPages]);
 
-  // Update read log on page change
+  // Setting the log ID also commits an unchanged initial/resumed page.
   useEffect(() => {
-    if (logIdRef.current == null) return;
-    updateLog.mutate({ id: logIdRef.current, LastPage: currentPage });
+    if (logId == null) return;
+    updateLog.mutate({ id: logId, LastPage: currentPage });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, logId]);
 
   // Update URL without navigation (use 1-based indexing in URL)
   useEffect(() => {
@@ -139,3 +148,4 @@ export function ViewerPage() {
     />
   );
 }
+

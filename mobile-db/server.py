@@ -7,10 +7,12 @@ import time
 from urllib.parse import urlparse
 from pathlib import Path
 from bookmark_sync import BookmarkStore, handle_request
+from activity_sync import ActivityStore
 
-ROOT = Path('/export')
+ROOT = Path(os.environ.get('VIOLET_EXPORT_ROOT', '/export'))
 ROOT.mkdir(parents=True, exist_ok=True)
-store = BookmarkStore('/state')
+store = BookmarkStore(os.environ.get('VIOLET_SYNC_STATE', '/state'))
+activity_store = ActivityStore(store)
 
 def make_snapshot():
     temp = ROOT / 'rawdata-korean.tmp.db'
@@ -93,11 +95,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        if self.path != '/api/bookmark-sync':
+        if self.path not in ('/api/bookmark-sync', '/api/activity-sync'):
             self.send_error(404)
             return
         self.connection.settimeout(60)
-        handle_request(self, store)
+        handle_request(self, activity_store if self.path == '/api/activity-sync' else store)
 
 def refresh_loop():
     while True:
