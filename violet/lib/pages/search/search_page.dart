@@ -24,7 +24,6 @@ import 'package:violet/database/user/search.dart';
 import 'package:violet/locale/locale.dart' as trans;
 import 'package:violet/log/log.dart';
 import 'package:violet/model/article_list_item.dart';
-import 'package:violet/pages/lab/lab/search_message.dart';
 import 'package:violet/pages/search/search_bar_page.dart';
 import 'package:violet/pages/search/search_page_controller.dart';
 import 'package:violet/pages/search/search_page_modify.dart';
@@ -192,7 +191,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
           floating: true,
           delegate: AnimatedOpacitySliver(
             searchBar: Stack(
-              children: <Widget>[searchBar(), msgsearch(), align()],
+              children: <Widget>[searchBar(), align()],
             ),
           ),
         )
@@ -205,7 +204,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
 
     if (widget.searchKeyWord == null) {
       scrollView = CustomScrollView(
-        cacheExtent: MediaQuery.of(context).size.height * 1.5,
+        cacheExtent: MediaQuery.of(context).size.height * 2.5,
         controller: c.scrollController,
         physics: const BouncingScrollPhysics(),
         slivers: slivers,
@@ -240,7 +239,7 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
                   return [];
                 },
             body: CustomScrollView(
-              cacheExtent: MediaQuery.of(context).size.height * 1.5,
+              cacheExtent: MediaQuery.of(context).size.height * 2.5,
               controller: ModalScrollController.of(context),
               physics: const BouncingScrollPhysics(),
               slivers: slivers,
@@ -460,45 +459,6 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
         '[showSearchBar] E: ${e.toString()}\n${st.toString()}',
       );
     }
-  }
-
-  msgsearch() {
-    final width = MediaQuery.of(context).size.width;
-
-    final msgsearchOverlay = InkWell(
-      onTap: () {
-        PlatformNavigator.navigateSlide(context, const LabSearchMessage());
-      },
-      child: const SizedBox(
-        height: 64,
-        width: 64,
-        child: Stack(
-          alignment: Alignment.center,
-          children: <Widget>[Icon(MdiIcons.commentSearch, color: Colors.grey)],
-        ),
-      ),
-    );
-
-    final msgsearchBody = Card(
-      color: Palette.themeColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(4.0)),
-      ),
-      elevation: !Settings.themeFlat.value ? 100 : 0,
-      clipBehavior: Clip.antiAliasWithSaveLayer,
-      child: msgsearchOverlay,
-    );
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(width - 8 - 64 - 8 - 64, 8, 8, 0),
-      child: SizedBox(
-        height: 64,
-        child: Hero(
-          tag: 'msgsearch${ModalBottomSheetContext.getCount()}',
-          child: msgsearchBody,
-        ),
-      ),
-    );
   }
 
   align() {
