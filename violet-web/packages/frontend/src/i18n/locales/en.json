@@ -250,5 +250,20 @@
         "close": "Close viewer"
       }
     }
+  },
+  "bookmarkSync": {
+    "heading": "App and web bookmarks",
+    "description": "Sync article bookmarks when opening the app or web after the selected interval. Folders, artist bookmarks, reading history and downloads remain on each device. New bookmarks go to the default folder.",
+    "token": "Sync token",
+    "interval": "Automatic sync interval",
+    "daily": "Once per day",
+    "weekly": "Once per week",
+    "save": "Save",
+    "now": "Sync now",
+    "busy": "Syncing…",
+    "saved": "Settings saved. An empty token disables synchronization.",
+    "notReady": "Sync is disabled or another sync is running.",
+    "success": "Sync complete: {{count}} distinct bookmarked articles.",
+    "error": "Sync failed. Check the token and connect to the WalnutPi network; your local bookmarks are retained."
   }
 }

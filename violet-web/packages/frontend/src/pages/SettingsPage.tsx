@@ -9,6 +9,7 @@ import { useSuggestions } from '../hooks/useSuggestions';
 import { useTagTranslation } from '../hooks/useTagTranslation';
 import { getCacheStats, clearAllCache } from '../services/image-cache';
 import styles from './SettingsPage.module.css';
+import { BookmarkSyncSettings } from '../components/settings/BookmarkSyncSettings';
 
 const themeColors = [
   'purple', 'amber', 'black', 'blue', 'blueGrey', 'brown',
@@ -184,6 +185,7 @@ export function SettingsPage() {
   return (
     <div className={styles.page}>
       <h2 className={styles.heading}>{t('settings.heading')}</h2>
+      <BookmarkSyncSettings />
 
       <div className={styles.section}>
         <h3 className={styles.subheading}>{t('settings.language.heading')}</h3>
