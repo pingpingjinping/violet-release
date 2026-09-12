@@ -36,9 +36,9 @@ class RecordViewPage extends StatelessWidget {
     return ValueListenableBuilder<List<Map<String, dynamic>>>(
       valueListenable: ActivitySync.records,
       builder: (context, _, __) => CardPanel.build(
-      context,
-      child: future(context, width),
-      enableBackgroundColor: true,
+        context,
+        child: future(context, width),
+        enableBackgroundColor: true,
       ),
     );
   }
@@ -339,4 +339,3 @@ class RecordArticleNotFoundItem extends StatelessWidget {
     );
   }
 }
-

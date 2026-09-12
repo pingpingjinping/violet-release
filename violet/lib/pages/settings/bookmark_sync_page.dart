@@ -114,7 +114,13 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
           onPressed: !_loaded || _busy ? null : _sync,
           child: Text(_busy ? '동기화 중…' : '지금 동기화'),
         ),
-        TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SharedActivityPage())), child: const Text('공유 읽기·다운로드 기록 보기')),
+        TextButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SharedActivityPage()),
+          ),
+          child: const Text('공유 읽기·다운로드 기록 보기'),
+        ),
         Text(_message),
       ],
     ),

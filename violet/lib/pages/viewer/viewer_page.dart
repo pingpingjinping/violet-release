@@ -382,4 +382,3 @@ class _ViewerPageState extends State<ViewerPage> {
     );
   }
 }
-

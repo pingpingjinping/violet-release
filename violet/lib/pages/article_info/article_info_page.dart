@@ -341,19 +341,19 @@ class ArticleInfoPage extends StatelessWidget {
       return;
     }
 
-    if ((await Download.getInstance()).isDownloadedArticle(
+    await ActivitySync.load();
+    final localDownload = (await Download.getInstance()).isDownloadedArticle(
       data.queryResult.id(),
       false,
-    )) {
-      if (await showYesNoDialog(context, '이미 다운로드된 작품입니다. 그래도 다운로드할까요?') !=
-          true) {
-        return;
-      }
-    }
-
-    await ActivitySync.load();
-    if (ActivitySync.downloadedOrigins(data.queryResult.id().toString()).contains('web')) {
-      if (await showYesNoDialog(context, '웹에서 다운로드한 기록이 있습니다. 이 기기에서도 다운로드할까요?') != true) return;
+    );
+    final webDownload = ActivitySync.downloadedOrigins(
+      data.queryResult.id().toString(),
+    ).contains('web');
+    if (localDownload || webDownload) {
+      final message = webDownload
+          ? '웹에서 다운로드한 기록이 있습니다. 이 기기에서도 다운로드할까요?'
+          : '이미 다운로드된 작품입니다. 그래도 다운로드할까요?';
+      if (await showYesNoDialog(context, message) != true) return;
     }
 
     showToast(
@@ -1202,4 +1202,3 @@ class _RelatedArea extends StatelessWidget {
     );
   }
 }
-

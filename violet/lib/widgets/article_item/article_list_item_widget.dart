@@ -191,11 +191,17 @@ class _ArticleListItemWidgetState extends State<ArticleListItemWidget>
       );
     }
 
-    return Stack(children: [
-      _cachedBuildWidget!,
-      Positioned(left: 0, right: 0, bottom: 0,
-        child: SharedActivityBadge(article: data.queryResult.id().toString())),
-    ]);
+    return Stack(
+      children: [
+        _cachedBuildWidget!,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SharedActivityBadge(article: data.queryResult.id().toString()),
+        ),
+      ],
+    );
   }
 
   _doBookmarkScaling() {
@@ -622,4 +628,3 @@ class ModalInsideModal extends StatelessWidget {
     );
   }
 }
-
