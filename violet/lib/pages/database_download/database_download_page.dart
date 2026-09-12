@@ -244,6 +244,11 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('db_exists', 1);
       await prefs.setString('databasetype', widget.dbType!);
+      if (widget.dbType! != 'dummy') {
+        await prefs.setInt('content-snapshot-version', SyncManager.getLatestDB().timestamp);
+      } else {
+        await prefs.remove('content-snapshot-version');
+      }
       if (widget.dbType! == 'global') {
         await prefs.setString(
           'databasesync',

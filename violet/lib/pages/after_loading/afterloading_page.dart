@@ -1,3 +1,4 @@
+import 'package:violet/services/content_db_sync.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -61,6 +62,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(BookmarkSync.automatic());
+    unawaited(_refreshContent());
     FToast().init(context);
 
     if (Platform.isAndroid ||
@@ -79,6 +81,15 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     });
   }
 
+  Future<void> _refreshContent() async {
+    final changed = await ContentDbSync.automatic(
+      () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
+    );
+    if (changed && mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+      Navigator.of(context).pushReplacementNamed('/AfterLoading');
+    }
+  }
+
   bool _alreadyLocked = false;
 
   @override
@@ -95,6 +106,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     switch (state) {
       case AppLifecycleState.resumed:
         unawaited(BookmarkSync.automatic());
+        unawaited(_refreshContent());
         if (Settings.useLockScreen.value &&
             Settings.useSecureMode.value &&
             !_alreadyLocked) {
