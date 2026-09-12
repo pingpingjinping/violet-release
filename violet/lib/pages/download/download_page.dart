@@ -42,6 +42,7 @@ import 'package:violet/pages/segment/filter_page_controller.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
 import 'package:violet/script/script_manager.dart';
 import 'package:violet/settings/settings.dart';
+import 'package:violet/services/download_service.dart';
 import 'package:violet/style/palette.dart';
 import 'package:violet/util/helper.dart';
 import 'package:violet/util/strings.dart';
@@ -53,9 +54,9 @@ import 'package:violet/widgets/theme_switchable_state.dart';
 typedef StringCallback = Future Function(String);
 
 class DownloadPageManager {
-  static bool downloadPageLoaded = false;
-  static StreamController<String>? taskController;
-  static StreamController<QueryResult>? taskFromQueryResultController;
+  static Future<void> add(QueryResult result) => DownloadService.instance.enqueue(
+    result.id().toString(), queryResult: result,
+  );
 }
 
 // This page must remain alive until the app is closed.
@@ -91,39 +92,36 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     super.initState();
 
     refresh();
-    // DownloadPageManager.appendTask = appendTask;
-    DownloadPageManager.taskController = StreamController<String>();
-    DownloadPageManager.taskController!.stream.listen((event) {
-      appendTask(event);
-    });
-    DownloadPageManager.taskFromQueryResultController =
-        StreamController<QueryResult>();
-    DownloadPageManager.taskFromQueryResultController!.stream.listen((event) {
-      appendTaskFromQueryResult(event);
-    });
+    DownloadService.instance.changes.addListener(refresh);
     indexBarDragListener.dragDetails.addListener(_indexChanged);
   }
 
   @override
   void dispose() {
-    DownloadPageManager.taskController!.close();
-    DownloadPageManager.taskFromQueryResultController!.close();
+    DownloadService.instance.changes.removeListener(refresh);
+    _refreshTimer?.cancel();
     indexBarDragListener.dragDetails.removeListener(_indexChanged);
     super.dispose();
   }
 
+  Timer? _refreshTimer;
+
   void refresh() {
-    Future.delayed(const Duration(milliseconds: 500), () async {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(const Duration(milliseconds: 200), () async {
+      if (!mounted) return;
       _getDownloadWidgetKey().forEach((key, value) {
         value.currentState?.thubmanilReload();
       });
-      items = await (await Download.getInstance()).getDownloadItems();
-      itemsMap = <int, DownloadItemModel>{};
+      items = await DownloadService.instance.items();
+      if (!mounted) return;
+      itemsMap = {for (final item in items) item.id(): item};
       filterResult = [];
       _listKey = ObjectKey(const Uuid().v4());
       queryResults = <int, QueryResult>{};
       await _autoRecoveryFileName();
       await _buildQueryResults();
+      if (!mounted) return;
       _applyFilter();
       if (mounted) setState(() {});
     });
@@ -235,7 +233,6 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   Widget build(BuildContext context) {
     super.build(context);
     final double statusBarHeight = MediaQuery.of(context).padding.top;
-    DownloadPageManager.downloadPageLoaded = true;
 
     return Container(
       padding: EdgeInsets.only(top: statusBarHeight),
@@ -877,15 +874,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       if (state != null) {
         await state.delete();
       } else {
-        final item =
-            itemsMap[id] ?? items.firstWhereOrNull((e) => e.id() == id);
-        if (item == null) continue;
-        if (item.state() == 0) {
-          for (var file in item.rawFiles()) {
-            if (await File(file).exists()) await File(file).delete();
-          }
-        }
-        await item.delete();
+        final item = itemsMap[id] ?? items.firstWhereOrNull((e) => e.id() == id);
+        if (item != null) await DownloadService.instance.delete(item);
       }
     }
 
@@ -897,14 +887,16 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
   void retryChecked() {
     for (final id in checked) {
-      _getDownloadWidgetKey()[id]?.currentState?.retry();
+      final item = itemsMap[id];
+      if (item != null) DownloadService.instance.retry(item);
     }
     exitCheckMode();
   }
 
   void recoveryChecked() {
     for (final id in checked) {
-      _getDownloadWidgetKey()[id]?.currentState?.recovery();
+      final item = itemsMap[id];
+      if (item != null) DownloadService.instance.retry(item, recover: true);
     }
     exitCheckMode();
   }
@@ -1119,13 +1111,15 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
           if (value == null) return;
 
           if (value == 0) {
-            _getDownloadWidgetKey().forEach(
-              (key, value) => value.currentState?.retryWhenRequired(),
-            );
+            for (final item in items) {
+              if (item.state() >= 5) DownloadService.instance.retry(item);
+            }
           } else if (value == 1) {
-            _getDownloadWidgetKey().forEach(
-              (key, value) => value.currentState?.recovery(),
-            );
+            for (final item in items) {
+              if (item.thumbnail()?.contains('e-hentai') == true ||
+                  item.thumbnail()?.contains('exhentai') == true) continue;
+              DownloadService.instance.retry(item, recover: true);
+            }
           } else if (value == 2) {
             Clipboard.setData(
               ClipboardData(
@@ -1411,7 +1405,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       filterResult.addAll(downloading.map((e) => itemsMap[e]!).toList());
     }
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   static String prefix2Tag(String prefix) {
@@ -1459,37 +1453,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     }
   }
 
-  Future<void> appendTask(String url) async {
-    var item = await (await Download.getInstance()).createNew(url);
-    item.download = true;
-    items.add(item);
-    itemsMap[item.id()] = item;
-    await _appendQueryResults(url);
-    _applyFilter();
-  }
+  Future<void> appendTask(String url) => DownloadService.instance.enqueue(url);
 
-  Future<void> appendTaskFromQueryResult(QueryResult qr) async {
-    final item = await (await Download.getInstance()).createNew(
-      qr.id().toString(),
-    );
-    item.download = true;
-    item.queryResult = qr;
-    items.add(item);
-    itemsMap[item.id()] = item;
-    queryResults[qr.id()] = qr;
-    _applyFilter();
-  }
+  Future<void> appendTaskFromQueryResult(QueryResult qr) =>
+      DownloadPageManager.add(qr);
 
-  Future<void> _appendQueryResults(String url) async {
-    if (int.tryParse(url) == null) return;
-
-    var queryRaw = 'SELECT * FROM HitomiColumnModel WHERE ';
-    queryRaw += 'Id = $url';
-
-    var qm = await QueryManager.query(queryRaw);
-
-    if (qm.results!.isEmpty) return;
-
-    queryResults[int.parse(url)] = qm.results!.first;
-  }
 }

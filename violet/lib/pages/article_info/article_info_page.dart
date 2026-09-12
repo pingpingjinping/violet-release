@@ -333,13 +333,6 @@ class ArticleInfoPage extends StatelessWidget {
         return;
       }
     }
-    if (!DownloadPageManager.downloadPageLoaded) {
-      showToast(
-        level: ToastLevel.warning,
-        message: 'You need to open the download tab!',
-      );
-      return;
-    }
 
     await ActivitySync.load();
     final localDownload = (await Download.getInstance()).isDownloadedArticle(
@@ -365,7 +358,7 @@ class ArticleInfoPage extends StatelessWidget {
 
     await ScriptManager.refresh();
 
-    DownloadPageManager.taskFromQueryResultController!.add(data.queryResult);
+    await DownloadPageManager.add(data.queryResult);
     Navigator.pop(context);
   }
 

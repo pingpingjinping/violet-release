@@ -92,7 +92,7 @@ class IsolateDownloader {
         tc = 128;
         await prefs.setInt('thread_count', 128);
       }
-      _threadCount = tc;
+      _threadCount = tc.clamp(1, 128);
     }
   }
 
@@ -134,6 +134,7 @@ class IsolateDownloader {
   }
 
   void changeThreadCount(int threadCount) {
+    threadCount = threadCount.clamp(1, 128);
     _threadCount = threadCount;
     _sendPort!.send(
       SendPortData(type: SendPortType.tasksize, data: threadCount),
@@ -141,6 +142,7 @@ class IsolateDownloader {
   }
 
   void cancel(int taskId) {
+    if (!_tasks.containsKey(taskId)) return;
     _sendPort!.send(SendPortData(type: SendPortType.cancel, data: taskId));
     _canceledTask.add(taskId);
     _tasks.remove(taskId);
@@ -149,9 +151,12 @@ class IsolateDownloader {
   void close() {
     _sendPort!.send(const SendPortData(type: SendPortType.terminate));
     _isolate.kill(priority: Isolate.immediate);
+    _receivePort.close();
   }
 
   void appendTask(DownloadTask task) {
+    task.accDownloadSize = 0;
+    task.isSizeEnsued = false;
     task.taskId = _taskTotalCount++;
     _tasks[task.taskId] = task;
     _sendPort!.send(
@@ -169,6 +174,9 @@ class IsolateDownloader {
   }
 
   DownloadTaskStatus getStatus(int taskId) {
+    if (_canceledTask.contains(taskId)) {
+      return DownloadTaskStatus(state: DownloadTaskState.cancel);
+    }
     if (_appendedTask.contains(taskId)) {
       if (_canceledTask.contains(taskId)) {
         return DownloadTaskStatus(state: DownloadTaskState.cancel);
@@ -201,6 +209,7 @@ class IsolateDownloader {
   }
 
   void _progressTask(IsolateDownloaderProgressProtocolUnit unit) {
+    if (!_tasks.containsKey(unit.id)) return;
     if (!_tasks[unit.id]!.isSizeEnsued) {
       _tasks[unit.id]!.isSizeEnsued = true;
       if (_tasks[unit.id]!.sizeCallback != null) {
@@ -218,6 +227,7 @@ class IsolateDownloader {
   }
 
   void _completeTask(int taskId) {
+    if (!_tasks.containsKey(taskId)) return;
     if (_tasks[taskId]!.completeCallback != null) {
       _tasks[taskId]!.completeCallback!();
     }
@@ -228,6 +238,7 @@ class IsolateDownloader {
   }
 
   Future<void> _errorTask(IsolateDownloaderErrorUnit unit) async {
+    if (!_tasks.containsKey(unit.id)) return;
     if (_tasks[unit.id]!.errorCallback != null) {
       _tasks[unit.id]!.errorCallback!(unit.error);
     }
@@ -246,6 +257,7 @@ class IsolateDownloader {
 
   Future<void> _retryTask(Map<dynamic, dynamic> data) async {
     var id = data['id'] as int;
+    if (!_tasks.containsKey(id)) return;
     var url = data['url'] as String;
     var count = data['count'] as int;
     var code = data['code'] as int;
