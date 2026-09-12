@@ -86,6 +86,13 @@ class User {
     return _instance;
   }
 
+  void clearCache() {
+    cachedReadLog = null;
+    _mergedReadLog = null;
+    _sharedSource = null;
+    _recentByArticle.clear();
+  }
+
   List<ArticleReadLog>? cachedReadLog;
   List<ArticleReadLog>? _mergedReadLog;
   List<Map<String, dynamic>>? _sharedSource;

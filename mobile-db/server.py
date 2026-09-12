@@ -1,3 +1,4 @@
+import json
 import hashlib
 import functools
 import http.server
@@ -9,11 +10,13 @@ from urllib.parse import urlparse
 from pathlib import Path
 from bookmark_sync import BookmarkStore, handle_request
 from activity_sync import ActivityStore
+from backup_store import BackupStore
 
 ROOT = Path(os.environ.get('VIOLET_EXPORT_ROOT', '/export'))
 ROOT.mkdir(parents=True, exist_ok=True)
 store = BookmarkStore(os.environ.get('VIOLET_SYNC_STATE', '/state'))
 activity_store = ActivityStore(store)
+backup_store = BackupStore(store)
 
 def make_snapshot():
     temp = ROOT / 'rawdata-korean.tmp.db'
@@ -82,6 +85,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        if self.path == '/api/server-info':
+            body = json.dumps({'schema': 1, 'features': {
+                'db': True, 'backups': True,
+                'graph': bool(os.environ.get('VIOLET_GRAPH_BASE_URL')),
+                'llm': bool(os.environ.get('VIOLET_LLM_BASE_URL')),
+            }}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == '/api/backups' or self.path.startswith('/api/backups/'):
+            backup_store.handle(self)
+            return
         if self.path == '/rawdata':
             self.path = '/rawdata-korean.db'
         if self.path == '/syncversion.txt':
@@ -101,11 +119,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Violet-Sync-Token')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Violet-Sync-Token, X-Violet-User-App-Id')
         self.end_headers()
 
     def do_POST(self):
+        if self.path == '/api/backups':
+            backup_store.handle(self)
+            return
         if self.path not in ('/api/bookmark-sync', '/api/activity-sync'):
             self.send_error(404)
             return

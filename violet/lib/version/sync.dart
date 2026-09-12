@@ -1,6 +1,7 @@
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
+import 'package:violet/services/server_config.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -43,7 +44,7 @@ class SyncInfoRecord {
 
 class SyncManager {
   static String syncInfoURL(String branch) {
-    return 'http://192.168.0.39:3002/syncversion.txt';
+    return ServerConfig.endpoint(ServerConfig.dbBase, 'syncversion.txt');
   }
 
   static bool firstSync = false;
@@ -120,7 +121,7 @@ class SyncManager {
           SyncInfoRecord(
             type: type,
             timestamp: timestamp,
-            url: url,
+            url: ServerConfig.downloadUrl(url, ServerConfig.webBase),
             size: size,
           ),
         );

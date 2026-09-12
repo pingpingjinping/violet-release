@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:io';
+import 'package:violet/services/server_config.dart';
 
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
@@ -57,7 +58,7 @@ class ContentDbSync {
         final fields = line.trim().split(RegExp(r'\s+'));
         if (fields.length < 3 || fields.first != 'db') continue;
         version = int.tryParse(fields[1]);
-        download = Uri.tryParse('${fields[2]}-korean.db');
+        download = Uri.tryParse(ServerConfig.downloadUrl('${fields[2]}-korean.db', ServerConfig.webBase));
         break;
       }
       if (version == null ||
@@ -65,7 +66,8 @@ class ContentDbSync {
           download == null ||
           !['http', 'https'].contains(download.scheme))
         return false;
-      if ((prefs.getInt('content-snapshot-version') ??
+      if ((prefs.getString('content-snapshot-server') ?? ServerConfig.defaultUrl) == ServerConfig.webBase &&
+          (prefs.getInt('content-snapshot-version') ??
               prefs.getInt('synclatest')) ==
           version) {
         return false;
@@ -129,6 +131,7 @@ class ContentDbSync {
       });
       onProgress?.call('검색 데이터 준비 중', 0, 0);
       await manager.checkOpen();
+      await prefs.setString('content-snapshot-server', ServerConfig.webBase);
       await prefs.setInt('content-snapshot-version', version);
       await prefs.setInt('synclatest', version);
       await prefs.setString(

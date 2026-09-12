@@ -16,6 +16,11 @@ class ActivitySync {
       'Kind TEXT, Device TEXT, Article TEXT, Origin TEXT, Timestamp INTEGER, '
       'Page INTEGER, Type INTEGER, PRIMARY KEY (Kind, Device, Article))';
 
+  static Future<void> reload() {
+    _loading = null;
+    return load();
+  }
+
   static Future<void> load() => _loading ??= _load().catchError((Object error) {
     _loading = null;
     throw error;

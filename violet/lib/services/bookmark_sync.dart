@@ -9,6 +9,7 @@ import 'package:violet/database/user/user.dart';
 import 'package:violet/log/log.dart';
 
 class BookmarkSync {
+  static final Lock operationLock = Lock();
   static final Lock _lock = Lock();
   static final ValueNotifier<int> changes = ValueNotifier(0);
   static final _numeric = RegExp(r'^\d{1,20}$');
@@ -20,15 +21,20 @@ class BookmarkSync {
 
   static Future<void> automatic() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      if (!(prefs.getBool('auto_record_sync') ?? true)) return;
-      await sync();
+      await operationLock.synchronized(() async {
+        final prefs = await SharedPreferences.getInstance();
+        if (!(prefs.getBool('auto_record_sync') ?? true)) return;
+        await _syncUnlocked();
+      });
     } catch (_) {
       Logger.error('[BookmarkSync] Automatic sync failed; local data retained');
     }
   }
 
-  static Future<int?> sync({bool force = false}) async {
+  static Future<int?> sync({bool force = false}) =>
+      operationLock.synchronized(() => _syncUnlocked(force: force));
+
+  static Future<int?> _syncUnlocked({bool force = false}) async {
     final count = await _syncBookmarks(force: force);
     await ActivitySync.sync(force: force);
     return count;
