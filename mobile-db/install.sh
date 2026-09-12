@@ -2,6 +2,12 @@
 set -eu
 
 cd "${VIOLET_PROJECT_DIR:-$HOME/violet}"
+# Newer installations store history/bookmarks in the backend. Applying this
+# browser-storage frontend bundle would remove APIs required by their screens.
+if grep -q 'getHistoryEntries' violet-web/packages/frontend/src/pages/HistoryPage.tsx 2>/dev/null; then
+    printf '%s\n' 'This newer backend-based frontend needs a version-matched compatibility patch.' >&2
+    exit 1
+fi
 task_backup_dir="$PWD/bookmark-sync-backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$task_backup_dir" mobile-db
 task_download_dir=$(mktemp -d)
@@ -25,7 +31,7 @@ violet-web/packages/frontend/src/i18n/locales/ja.json
 violet-web/packages/frontend/src/i18n/locales/zh.json
 violet-web/packages/frontend/src/services/activity-sync.ts
 violet-web/packages/frontend/src/hooks/useSharedActivity.ts
-violet-web/packages/frontend/src/api/history.ts
+violet-web/packages/frontend/src/pages/HistoryPage.tsx
 violet-web/packages/frontend/src/api/downloads.ts
 violet-web/packages/frontend/src/hooks/useDownloads.ts
 violet-web/packages/frontend/src/components/search/ArticleCard.tsx

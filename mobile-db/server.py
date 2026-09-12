@@ -1,3 +1,4 @@
+import hashlib
 import functools
 import http.server
 import os
@@ -51,6 +52,16 @@ def make_snapshot():
         target.close()
         source.close()
     output = ROOT / 'rawdata-korean.db'
+    def digest(path):
+        value = hashlib.sha256()
+        with path.open('rb') as stream:
+            while chunk := stream.read(1024 * 1024):
+                value.update(chunk)
+        return value.digest()
+    if output.exists() and digest(temp) == digest(output):
+        temp.unlink()
+        print('Korean DB unchanged; keeping snapshot version', flush=True)
+        return
     os.replace(temp, output)
     manifest = ROOT / 'syncversion.tmp'
     manifest.write_text(f'db {int(time.time())} http://localhost:3002/rawdata\n', encoding='utf-8')

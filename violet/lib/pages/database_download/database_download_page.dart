@@ -21,7 +21,6 @@ import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/common/toast.dart';
 import 'package:violet/settings/settings.dart';
-import 'package:violet/src/rust/api/simple.dart';
 import 'package:violet/version/sync.dart';
 
 typedef TagIndexingCallback = dynamic Function(QueryResult);
@@ -244,6 +243,11 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('db_exists', 1);
       await prefs.setString('databasetype', widget.dbType!);
+      if (widget.dbType! != 'dummy') {
+        await prefs.setInt('content-snapshot-version', SyncManager.getLatestDB().timestamp);
+      } else {
+        await prefs.remove('content-snapshot-version');
+      }
       if (widget.dbType! == 'global') {
         await prefs.setString(
           'databasesync',
