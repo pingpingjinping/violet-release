@@ -18,7 +18,7 @@ import 'package:violet/settings/settings.dart';
 
 class VioletServer {
   static const protocol = 'https';
-  static const host = 'koromo.cc/api';
+  static const host = '192.168.0.39:3001/api';
   static const api = '$protocol://$host';
 
   static Future<dynamic> top(int offset, int count, String type) async {
