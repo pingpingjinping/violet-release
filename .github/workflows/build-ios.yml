@@ -1,6 +1,14 @@
 name: Build iOS IPA
 
 on:
+  pull_request:
+    branches: ["dev"]
+    paths:
+      - "violet/lib/services/download*.dart"
+      - "violet/lib/pages/download/**"
+      - "violet/lib/downloader/**"
+      - "violet/ios/Runner/AppDelegate.swift"
+      - ".github/workflows/build-ios.yml"
   push:
     branches: ["dev", "main", "master"]
   workflow_dispatch:
