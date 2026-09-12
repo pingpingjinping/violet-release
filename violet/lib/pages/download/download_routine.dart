@@ -24,7 +24,12 @@ class DownloadRoutine {
 
   final bool Function()? shouldCancel;
 
-  DownloadRoutine(this.item, this.setStateCallback, this.thumbnailCallback, {this.shouldCancel}) {
+  DownloadRoutine(
+    this.item,
+    this.setStateCallback,
+    this.thumbnailCallback, {
+    this.shouldCancel,
+  }) {
     result = Map<String, dynamic>.from(item.result);
   }
 

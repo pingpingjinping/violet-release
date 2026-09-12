@@ -54,9 +54,8 @@ import 'package:violet/widgets/theme_switchable_state.dart';
 typedef StringCallback = Future Function(String);
 
 class DownloadPageManager {
-  static Future<void> add(QueryResult result) => DownloadService.instance.enqueue(
-    result.id().toString(), queryResult: result,
-  );
+  static Future<void> add(QueryResult result) => DownloadService.instance
+      .enqueue(result.id().toString(), queryResult: result);
 }
 
 // This page must remain alive until the app is closed.
@@ -427,35 +426,32 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       } else {
         return SliverList(
           key: _listKey,
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final e = filterResult[filterResult.length - 1 - index];
-              if (!downloadItemWidgetKeys3.containsKey(e.id())) {
-                downloadItemWidgetKeys3[e.id()] =
-                    GlobalKey<DownloadItemWidgetState>();
-              }
-              return Align(
-                key: Key('dp${e.id()}${e.url()}'),
-                alignment: Alignment.center,
-                child: DownloadItemWidget(
-                  key: downloadItemWidgetKeys3[e.id()],
-                  initialStyle: DownloadListItem(
-                    showDetail: Settings.downloadResultType.value.isDetail,
-                    addBottomPadding: true,
-                    width: windowWidth - 4.0,
-                  ),
-                  item: e,
-                  download: e.download,
-                  refeshCallback: refresh,
-                  isCheckMode: checkMode,
-                  isChecked: checked.contains(e.id()),
-                  checkCallback: (value) => check(e.id(), value),
-                  longPressCallback: () => longpress(e.id()),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final e = filterResult[filterResult.length - 1 - index];
+            if (!downloadItemWidgetKeys3.containsKey(e.id())) {
+              downloadItemWidgetKeys3[e.id()] =
+                  GlobalKey<DownloadItemWidgetState>();
+            }
+            return Align(
+              key: Key('dp${e.id()}${e.url()}'),
+              alignment: Alignment.center,
+              child: DownloadItemWidget(
+                key: downloadItemWidgetKeys3[e.id()],
+                initialStyle: DownloadListItem(
+                  showDetail: Settings.downloadResultType.value.isDetail,
+                  addBottomPadding: true,
+                  width: windowWidth - 4.0,
                 ),
-              );
-            },
-            childCount: filterResult.length,
-          ),
+                item: e,
+                download: e.download,
+                refeshCallback: refresh,
+                isCheckMode: checkMode,
+                isChecked: checked.contains(e.id()),
+                checkCallback: (value) => check(e.id(), value),
+                longPressCallback: () => longpress(e.id()),
+              ),
+            );
+          }, childCount: filterResult.length),
         );
       }
     }
@@ -874,7 +870,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       if (state != null) {
         await state.delete();
       } else {
-        final item = itemsMap[id] ?? items.firstWhereOrNull((e) => e.id() == id);
+        final item =
+            itemsMap[id] ?? items.firstWhereOrNull((e) => e.id() == id);
         if (item != null) await DownloadService.instance.delete(item);
       }
     }
@@ -1117,7 +1114,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
           } else if (value == 1) {
             for (final item in items) {
               if (item.thumbnail()?.contains('e-hentai') == true ||
-                  item.thumbnail()?.contains('exhentai') == true) continue;
+                  item.thumbnail()?.contains('exhentai') == true)
+                continue;
               DownloadService.instance.retry(item, recover: true);
             }
           } else if (value == 2) {
@@ -1457,5 +1455,4 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
   Future<void> appendTaskFromQueryResult(QueryResult qr) =>
       DownloadPageManager.add(qr);
-
 }

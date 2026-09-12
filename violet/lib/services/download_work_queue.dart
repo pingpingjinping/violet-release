@@ -8,7 +8,8 @@ class DownloadWorkQueue extends ChangeNotifier {
   DownloadWorkQueue({required this.keepAwake});
 
   final Future<void> Function(bool) keepAwake;
-  final Queue<(int, Future<void> Function(), Completer<void>)> _pending = Queue();
+  final Queue<(int, Future<void> Function(), Completer<void>)> _pending =
+      Queue();
   final Map<int, Future<void>> _submitted = {};
   bool _draining = false;
   int? activeId;

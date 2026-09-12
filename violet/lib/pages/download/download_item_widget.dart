@@ -88,7 +88,6 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
   int latestReadPage = 0;
   bool disposed = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -163,7 +162,8 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
       downloadSpeed = speed < 512000
           ? '${(speed / 1024).toStringAsFixed(1)} KB/S'
           : '${(speed / 1024 / 1024).toStringAsFixed(1)} MB/S';
-      final signature = '${widget.item.thumbnail()}:${widget.item.state() == 0}';
+      final signature =
+          '${widget.item.thumbnail()}:${widget.item.state() == 0}';
       if (signature != _thumbnailSignature) _shouldReload = true;
       _thumbnailSignature = signature;
     });
@@ -507,7 +507,8 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
       case 3:
         // state =
         //     '[$downloadedFileCount/$downloadTotalFileCount] ($downloadSpeed ${(download / 1024.0 / 1024.0).toStringAsFixed(1)} MB)';
-        state = '[$downloadedFileCount/$downloadTotalFileCount] · $downloadSpeed';
+        state =
+            '[$downloadedFileCount/$downloadTotalFileCount] · $downloadSpeed';
         pp = '${Translations.instance!.trans('progress')}: ';
         break;
 

@@ -65,9 +65,11 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     FToast().init(context);
     DownloadService.instance.completed.addListener(_downloadCompleted);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(DownloadService.instance.initialize().catchError((Object error) {
-        debugPrint('Download initialization: $error');
-      }));
+      unawaited(
+        DownloadService.instance.initialize().catchError((Object error) {
+          debugPrint('Download initialization: $error');
+        }),
+      );
     });
 
     if (Platform.isAndroid ||
@@ -94,7 +96,8 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     showToast(
       icon: Icons.download,
       level: ToastLevel.check,
-      message: '${item.url()} ${Translations.instance!.trans('download')} ${Translations.instance!.trans('complete')}',
+      message:
+          '${item.url()} ${Translations.instance!.trans('download')} ${Translations.instance!.trans('complete')}',
     );
   }
 
@@ -461,7 +464,8 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     builder: (context, _) {
       final queue = DownloadService.instance.queue;
       return Tooltip(
-        message: '진행 ${queue.activeId == null ? 0 : 1} · 대기 ${queue.pendingCount}',
+        message:
+            '진행 ${queue.activeId == null ? 0 : 1} · 대기 ${queue.pendingCount}',
         child: Badge(
           isLabelVisible: queue.totalCount > 0,
           label: Text('${queue.totalCount}'),

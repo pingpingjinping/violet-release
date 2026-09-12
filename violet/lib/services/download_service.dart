@@ -33,13 +33,18 @@ class DownloadService {
   final Map<int, GalleryDownloadProgress> _jobs = {};
   Future<void>? _initializing;
   final _submission = Lock();
-  late final queue = DownloadWorkQueue(keepAwake: (enabled) async {
-    if (Platform.isIOS || Platform.isAndroid) {
-      await _screen.invokeMethod<void>('setKeepAwake', enabled);
-    }
-  });
+  late final queue = DownloadWorkQueue(
+    keepAwake: (enabled) async {
+      if (Platform.isIOS || Platform.isAndroid) {
+        await _screen.invokeMethod<void>('setKeepAwake', enabled);
+      }
+    },
+  );
 
-  Future<void> initialize() => _initializing ??= _initialize().catchError((Object error, StackTrace stack) {
+  Future<void> initialize() => _initializing ??= _initialize().catchError((
+    Object error,
+    StackTrace stack,
+  ) {
     _initializing = null;
     Error.throwWithStackTrace(error, stack);
   });
@@ -51,8 +56,9 @@ class DownloadService {
     }
     await Download.getInstance();
     final db = await CommonUserDatabase.getInstance();
-    final items = (await db.query('SELECT * FROM DownloadItem WHERE State BETWEEN 1 AND 4'))
-        .map((row) => DownloadItemModel(result: row));
+    final items = (await db.query(
+      'SELECT * FROM DownloadItem WHERE State BETWEEN 1 AND 4',
+    )).map((row) => DownloadItemModel(result: row));
     for (final item in items) {
       if (item.state() == 1) {
         _start(item);
@@ -69,7 +75,8 @@ class DownloadService {
   Future<List<DownloadItemModel>> items() async {
     await initialize();
     return (await (await Download.getInstance()).getDownloadItems())
-        .map((item) => _jobs[item.id()]?.item ?? item).toList();
+        .map((item) => _jobs[item.id()]?.item ?? item)
+        .toList();
   }
 
   Future<void> enqueue(String url, {QueryResult? queryResult}) async {
@@ -96,14 +103,21 @@ class DownloadService {
     _jobs[item.id()] = job;
     job.finished = queue.submit(item.id(), () => _run(job, recover));
     // Failures are stored in the item, so callers do not need to await completion.
-    unawaited(job.finished!.catchError((Object error) {
-      debugPrint('Download failed: $error');
-    }));
+    unawaited(
+      job.finished!.catchError((Object error) {
+        debugPrint('Download failed: $error');
+      }),
+    );
   }
 
   Future<void> _run(GalleryDownloadProgress job, bool recover) async {
     if (job.cancelled) return;
-    final routine = DownloadRoutine(job.item, job.changed, job.changed, shouldCancel: () => job.cancelled);
+    final routine = DownloadRoutine(
+      job.item,
+      job.changed,
+      job.changed,
+      shouldCancel: () => job.cancelled,
+    );
     job.routine = routine;
     final clock = Stopwatch()..start();
     var lastTime = 0;
@@ -111,7 +125,8 @@ class DownloadService {
     final timer = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = clock.elapsedMilliseconds;
       final elapsed = now - lastTime;
-      if (elapsed > 0) job.bytesPerSecond = (job.bytes - lastBytes) * 1000 / elapsed;
+      if (elapsed > 0)
+        job.bytesPerSecond = (job.bytes - lastBytes) * 1000 / elapsed;
       lastBytes = job.bytes;
       lastTime = now;
       job.changed();
@@ -119,10 +134,12 @@ class DownloadService {
     try {
       await job.item.update();
       await routine.selectExtractor();
-      await routine.createTasks(progressCallback: (current, total) async {
-        job.extracted = current;
-        job.total = total;
-      });
+      await routine.createTasks(
+        progressCallback: (current, total) async {
+          job.extracted = current;
+          job.total = total;
+        },
+      );
       if (job.cancelled) return;
       if (job.item.state() >= 5) return;
       if (await routine.checkNothingToDownload()) return;
@@ -144,8 +161,12 @@ class DownloadService {
       if (job.cancelled) return;
       job.completed = job.total - missing.length;
       if (!recover || missing.isNotEmpty) {
-        await routine.retryInvalidDownloadFiles(missing,
-          completeCallback: complete, downloadCallback: bytes, errorCallback: error);
+        await routine.retryInvalidDownloadFiles(
+          missing,
+          completeCallback: complete,
+          downloadCallback: bytes,
+          errorCallback: error,
+        );
         await wait();
       }
       for (var attempt = 0; attempt < 2 && !job.cancelled; attempt++) {
@@ -153,8 +174,12 @@ class DownloadService {
         if (job.cancelled) return;
         if (invalid.isEmpty) break;
         job.completed = job.total - invalid.length;
-        await routine.retryInvalidDownloadFiles(invalid,
-          completeCallback: complete, downloadCallback: bytes, errorCallback: error);
+        await routine.retryInvalidDownloadFiles(
+          invalid,
+          completeCallback: complete,
+          downloadCallback: bytes,
+          errorCallback: error,
+        );
         await wait();
       }
       if (job.cancelled) return;
