@@ -34,6 +34,7 @@ import 'package:violet/variables.dart';
 import 'package:violet/version/update_sync.dart';
 import 'package:violet/widgets/patch_note_prompt.dart';
 import 'package:violet/services/bookmark_sync.dart';
+import 'package:violet/services/download_service.dart';
 
 class AfterLoadingPage extends StatefulWidget {
   const AfterLoadingPage({super.key});
@@ -62,6 +63,14 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     WidgetsBinding.instance.addObserver(this);
     unawaited(BookmarkSync.automatic());
     FToast().init(context);
+    DownloadService.instance.completed.addListener(_downloadCompleted);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        DownloadService.instance.initialize().catchError((Object error) {
+          debugPrint('Download initialization: $error');
+        }),
+      );
+    });
 
     if (Platform.isAndroid ||
         Platform.isIOS ||
@@ -81,9 +90,21 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
 
   bool _alreadyLocked = false;
 
+  void _downloadCompleted() {
+    final item = DownloadService.instance.completed.value;
+    if (!mounted || item == null) return;
+    showToast(
+      icon: Icons.download,
+      level: ToastLevel.check,
+      message:
+          '${item.url()} ${Translations.instance!.trans('download')} ${Translations.instance!.trans('complete')}',
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    DownloadService.instance.completed.removeListener(_downloadCompleted);
     _deeplinkSubscription?.cancel();
     _shareSubscription?.cancel();
     super.dispose();
@@ -366,7 +387,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
                   ? const Color(0xFF060606)
                   : Colors.grey.shade900.withOpacity(0.90)
             : Colors.grey.shade50,
-        icon: Icon(iconData),
+        icon: key == 'download' ? _downloadIcon(iconData) : Icon(iconData),
         label: translations.trans(key),
       );
     }
@@ -438,6 +459,22 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     return result;
   }
 
+  Widget _downloadIcon(IconData icon) => AnimatedBuilder(
+    animation: DownloadService.instance.queue,
+    builder: (context, _) {
+      final queue = DownloadService.instance.queue;
+      return Tooltip(
+        message:
+            '진행 ${queue.activeId == null ? 0 : 1} · 대기 ${queue.pendingCount}',
+        child: Badge(
+          isLabelVisible: queue.totalCount > 0,
+          label: Text('${queue.totalCount}'),
+          child: Icon(icon),
+        ),
+      );
+    },
+  );
+
   Widget _buildDrawer(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final translations = Translations.instance!;
@@ -464,7 +501,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
             child: Row(
               children: [
                 const SizedBox(width: 12),
-                Icon(iconData),
+                page == 3 ? _downloadIcon(iconData) : Icon(iconData),
                 const SizedBox(width: 12),
                 Text(
                   translations.trans(key),

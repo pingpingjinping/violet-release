@@ -58,6 +58,19 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         GeneratedPluginRegistrant.registerWith(flutterEngine)
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "xyz.project.violet/downloadScreen").setMethodCallHandler { call, result ->
+            if (call.method == "setKeepAwake" && call.arguments is Boolean) {
+                if (call.arguments as Boolean) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                result.success(null)
+            } else {
+                result.notImplemented()
+            }
+        }
+
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, VOLUME_CHANNEL).setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink?) {
                 sink = eventSink

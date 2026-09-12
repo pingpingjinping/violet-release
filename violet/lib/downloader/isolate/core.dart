@@ -260,7 +260,8 @@ void _initIsolateDownloader(IsolateDownloaderOption option) {
 }
 
 void _cancelTask(int taskId) {
-  _workingMap[taskId]!.cancelToken!.cancel();
+  _dqueue.removeWhere((task) => task.id == taskId);
+  _workingMap[taskId]?.cancelToken?.cancel();
 }
 
 /// cancel all tasks and remove dqueue

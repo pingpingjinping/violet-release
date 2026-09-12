@@ -1,7 +1,6 @@
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -21,8 +20,16 @@ class DownloadRoutine {
   VoidCallback setStateCallback;
   VoidCallback thumbnailCallback;
   List<violetd.DownloadTask>? tasks;
+  final List<int> submittedTaskIds = [];
 
-  DownloadRoutine(this.item, this.setStateCallback, this.thumbnailCallback) {
+  final bool Function()? shouldCancel;
+
+  DownloadRoutine(
+    this.item,
+    this.setStateCallback,
+    this.thumbnailCallback, {
+    this.shouldCancel,
+  }) {
     result = Map<String, dynamic>.from(item.result);
   }
 
@@ -84,7 +91,7 @@ class DownloadRoutine {
         );
       }
     } catch (e) {
-      _setState(7);
+      await setFailed(e.toString());
       return;
     }
   }
@@ -173,21 +180,24 @@ class DownloadRoutine {
   }) async {
     final downloader = await IsolateDownloader.getInstance();
 
-    downloader.appendTasks(
-      invalidIndex.map((e) => tasks![e]).map((e) {
-        e.startCallback = () {};
-        e.completeCallback = completeCallback;
-
-        e.sizeCallback = (byte) {};
-        e.downloadCallback = downloadCallback;
-
-        e.errorCallback = errorCallback;
-
-        return e;
-      }).toList(),
-    );
+    if (shouldCancel?.call() ?? false) return;
+    final retryTasks = invalidIndex.map((e) => tasks![e]).map((e) {
+      e.startCallback = () {};
+      e.completeCallback = completeCallback;
+      e.sizeCallback = (byte) {};
+      e.downloadCallback = downloadCallback;
+      e.errorCallback = errorCallback;
+      return e;
+    }).toList();
+    downloader.appendTasks(retryTasks);
+    submittedTaskIds.addAll(retryTasks.map((task) => task.taskId));
 
     await _setState(3);
+  }
+
+  Future<void> setFailed(String message) async {
+    result['ErrorMsg'] = message;
+    await _setState(5);
   }
 
   Future<void> setDownloadComplete() async {

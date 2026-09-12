@@ -1,7 +1,6 @@
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -18,7 +17,7 @@ import 'package:violet/locale/locale.dart';
 import 'package:violet/pages/common/toast.dart';
 import 'package:violet/pages/common/utils.dart';
 import 'package:violet/pages/download/download_item_menu.dart';
-import 'package:violet/pages/download/download_routine.dart';
+import 'package:violet/services/download_service.dart';
 import 'package:violet/pages/viewer/viewer_page.dart';
 import 'package:violet/pages/viewer/viewer_page_provider.dart';
 import 'package:violet/script/script_manager.dart';
@@ -80,25 +79,18 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
   int max = 0;
 
   double download = 0;
-  double downloadSec = 0;
   int downloadTotalFileCount = 0;
   int downloadedFileCount = 0;
-  int errorFileCount = 0;
   String downloadSpeed = ' KB/S';
-  bool once = false;
-  bool recoveryMode = false;
   late double thisWidth, thisHeight;
   late DownloadListItem style;
   bool isLastestRead = false;
   int latestReadPage = 0;
   bool disposed = false;
 
-  bool downloaded = false;
-
   @override
   void initState() {
     super.initState();
-    downloaded = widget.download;
     _styleCallback(widget.initialStyle);
 
     _checkLastRead();
@@ -146,137 +138,49 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
     setState(() {});
   }
 
+  GalleryDownloadProgress? _progress;
+  String? _thumbnailSignature;
+
   void _downloadProcedure() {
-    Future.delayed(const Duration(milliseconds: 500)).then((value) async {
-      if (once) return;
-      once = true;
+    _progress?.removeListener(_updateProgress);
+    _progress = DownloadService.instance.progress(widget.item.id());
+    _progress?.addListener(_updateProgress);
+    _updateProgress();
+  }
 
-      final routine = DownloadRoutine(
-        widget.item,
-        () => setState(() {}),
-        () => setState(() {
-          _shouldReload = true;
-        }),
-      );
-
-      if (!await routine.checkValidState()) {
-        return;
-      }
-      await routine.selectExtractor();
-
-      if (!downloaded) {
-        await routine.setToStop();
-        return;
-      }
-
-      await routine.createTasks(
-        progressCallback: (cur, max) async {
-          setState(() {
-            this.cur = cur;
-            if (this.max < max) this.max = max;
-          });
-        },
-      );
-
-      if (await routine.checkNothingToDownload()) return;
-
-      downloadTotalFileCount = routine.tasks!.length;
-
-      await routine.extractFilePath();
-
-      final timer = Timer.periodic(const Duration(milliseconds: 100), (
-        Timer timer,
-      ) {
-        setState(() {
-          if (downloadSec / 1024 < 500.0) {
-            downloadSpeed = '${(downloadSec / 1024).toStringAsFixed(1)} KB/S';
-          } else {
-            downloadSpeed =
-                '${(downloadSec / 1024 / 1024).toStringAsFixed(1)} MB/S';
-          }
-          downloadSec = 0;
-        });
-      });
-
-      if (!recoveryMode) {
-        await routine.appendDownloadTasks(
-          completeCallback: () {
-            downloadedFileCount++;
-          },
-          downloadCallback: (byte) {
-            download += byte;
-            downloadSec += byte;
-          },
-          errorCallback: (err) {
-            downloadedFileCount++;
-            errorFileCount++;
-          },
-        );
-
-        // Wait for download complete
-        while (downloadTotalFileCount != downloadedFileCount) {
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
-      } else {
-        downloadedFileCount = downloadTotalFileCount;
-      }
-
-      const maxRetryCount = 20;
-      var retryCount = 0;
-
-      // retry download when file is invalid or downloaded fail.
-      while (retryCount < maxRetryCount) {
-        var invalidFiles = await routine.checkDownloadFiles();
-
-        if (invalidFiles.isEmpty || invalidFiles.length == errorFileCount) {
-          break;
-        }
-
-        errorFileCount = 0;
-        retryCount += 1;
-
-        downloadedFileCount -= invalidFiles.length;
-
-        await routine.retryInvalidDownloadFiles(
-          invalidFiles,
-          completeCallback: () {
-            downloadedFileCount++;
-          },
-          downloadCallback: (byte) {
-            download += byte;
-            downloadSec += byte;
-          },
-          errorCallback: (err) {
-            downloadedFileCount++;
-            errorFileCount++;
-          },
-        );
-
-        while (downloadTotalFileCount != downloadedFileCount) {
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
-      }
-
-      timer.cancel();
-
-      await routine.setDownloadComplete();
-
-      recoveryMode = false;
-
-      if (!disposed) {
-        showToast(
-          icon: Icons.download,
-          level: ToastLevel.check,
-          message:
-              '${widget.item.info()!.split('[')[1].split(']').first}${Translations.instance!.trans('download')} ${Translations.instance!.trans('complete')}',
-        );
-      }
+  void _updateProgress() {
+    if (!mounted || _progress == null) return;
+    final progress = _progress!;
+    setState(() {
+      widget.item.result = progress.item.result;
+      cur = progress.extracted;
+      max = progress.total;
+      download = progress.bytes;
+      downloadTotalFileCount = progress.total;
+      downloadedFileCount = progress.completed;
+      final speed = progress.bytesPerSecond;
+      downloadSpeed = speed < 512000
+          ? '${(speed / 1024).toStringAsFixed(1)} KB/S'
+          : '${(speed / 1024 / 1024).toStringAsFixed(1)} MB/S';
+      final signature =
+          '${widget.item.thumbnail()}:${widget.item.state() == 0}';
+      if (signature != _thumbnailSignature) _shouldReload = true;
+      _thumbnailSignature = signature;
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant DownloadItemWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_progress != DownloadService.instance.progress(widget.item.id())) {
+      _downloadProcedure();
+    }
   }
 
   @override
   void dispose() {
     disposed = true;
+    _progress?.removeListener(_updateProgress);
     super.dispose();
   }
 
@@ -423,44 +327,17 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
   }
 
   void _retry() {
-    // Retry
-    var copy = Map<String, dynamic>.from(widget.item.result);
-    copy['State'] = 1;
-    widget.item.result = copy;
-    once = false;
-    downloaded = true;
+    DownloadService.instance.retry(widget.item);
     _downloadProcedure();
-    setState(() {
-      _shouldReload = true;
-    });
   }
 
-  Future<void> delete() async {
-    if (widget.item.state() == 0) {
-      for (var file in widget.item.rawFiles()) {
-        if (await File(file).exists()) await File(file).delete();
-      }
-    }
-    await widget.item.delete();
-    (await Download.getInstance()).refresh();
-  }
+  Future<void> delete() => DownloadService.instance.delete(widget.item);
 
-  void retry() {
-    _retry();
-  }
+  void retry() => _retry();
 
   void _recovery() {
-    // recovery
-    var copy = Map<String, dynamic>.from(widget.item.result);
-    copy['State'] = 1;
-    widget.item.result = copy;
-    downloaded = true;
-    once = false;
-    recoveryMode = true;
+    DownloadService.instance.retry(widget.item, recover: true);
     _downloadProcedure();
-    setState(() {
-      _shouldReload = true;
-    });
   }
 
   void retryWhenRequired() {
@@ -630,10 +507,16 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
       case 3:
         // state =
         //     '[$downloadedFileCount/$downloadTotalFileCount] ($downloadSpeed ${(download / 1024.0 / 1024.0).toStringAsFixed(1)} MB)';
-        state = '[$downloadedFileCount/$downloadTotalFileCount]';
+        state =
+            '[$downloadedFileCount/$downloadTotalFileCount] · $downloadSpeed';
         pp = '${Translations.instance!.trans('progress')}: ';
         break;
 
+      case 5:
+        state = Translations.instance!.trans('unknownerr');
+        pp = widget.item.errorMsg() ?? '';
+        statecolor = Colors.red;
+        break;
       case 6:
         state = Translations.instance!.trans('stop');
         pp = '';
