@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:violet/pages/settings/shared_activity_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:violet/services/bookmark_sync.dart';
 
@@ -63,7 +64,7 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
       if (mounted)
         setState(
           () => _message =
-              '동기화 실패. 토큰과 WalnutPi 네트워크 연결을 확인해 주세요. 기기의 북마크는 보존됩니다.',
+              '동기화 실패. 토큰과 WalnutPi 네트워크 연결을 확인해 주세요. 기기의 기록은 보존됩니다.',
         );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -72,12 +73,12 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('앱·웹 작품 북마크 동기화')),
+    appBar: AppBar(title: const Text('앱·웹 기록 동기화')),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const Text(
-          '선택한 주기가 지난 뒤 앱을 열면 작품 북마크를 동기화합니다. 폴더·작가 북마크·읽은 기록·다운로드는 기기별로 유지됩니다. 새로 받은 북마크는 미분류 폴더에 들어갑니다.',
+          '선택한 주기가 지난 뒤 앱을 열면 작품 북마크·읽은 기록·완료한 다운로드 기록을 동기화합니다. 폴더·작가 북마크·다운로드 파일은 기기에 유지됩니다. 새 북마크는 미분류 폴더에 들어갑니다.',
         ),
         const SizedBox(height: 16),
         TextField(
@@ -113,6 +114,7 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
           onPressed: !_loaded || _busy ? null : _sync,
           child: Text(_busy ? '동기화 중…' : '지금 동기화'),
         ),
+        TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SharedActivityPage())), child: const Text('공유 읽기·다운로드 기록 보기')),
         Text(_message),
       ],
     ),

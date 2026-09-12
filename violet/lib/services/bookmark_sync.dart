@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:violet/services/activity_sync.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +26,13 @@ class BookmarkSync {
     }
   }
 
-  static Future<int?> sync({bool force = false}) =>
+  static Future<int?> sync({bool force = false}) async {
+    final count = await _syncBookmarks(force: force);
+    await ActivitySync.sync(force: force);
+    return count;
+  }
+
+  static Future<int?> _syncBookmarks({bool force = false}) =>
       _lock.synchronized(() async {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('bookmark_sync_token') ?? '';

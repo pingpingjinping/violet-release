@@ -1,79 +1,85 @@
-# App/web article bookmark synchronization
+# App/web bookmarks, reading progress and download records
 
-This first version synchronizes the presence or absence of numeric article
-bookmarks. It preserves existing app folders and duplicate rows. Remote-only
-articles go into the default folder. Folder changes, artist bookmarks, reading
-history, crop bookmarks, downloaded images and download jobs are not synchronized.
-No personal database, bookmark ID list or token is committed to the repository.
+App and web exchange article bookmark additions/deletions, the latest reading
+position per work/device, and completed-download history. Files, local paths,
+failed/pending downloads, artist bookmarks and bookmark folders are not transferred.
+Remote bookmarks enter the default folder; existing duplicate rows/folders remain.
 
-The app and web keep their own databases. When enabled, each client exchanges
-changes on launch/foreground after one or seven days since its last successful
-sync. "Sync now" bypasses that interval. Failures keep local changes pending.
-There is no background iOS scheduling or constant polling. A device that remains
-open all day can use the manual button.
+Downloads carry only the numeric work ID, timestamp and device/app-or-web origin.
+Shared download records appear in the web downloads page and in the app's separate
+shared-records page, accessible from Downloads and Sync settings. Work cards show
+where a work was downloaded. Downloading again prompts for confirmation. Actual
+local download records/files remain separate: a remote completion is never treated
+as a local file or a job that can be opened, retried or deleted.
 
-## Install on WalnutPi
+The registry records that a work **was downloaded**. Deleting files or local history
+does not remove the shared historical mark. This version does not offer shared
+history deletion. Reading sync stores the latest position per work/device, rather
+than every session. Local sessions remain intact. When choosing reading position,
+the most recent timestamp wins; this allows rereading earlier pages. Devices should
+have correct clocks. The wire protocol uses UTC milliseconds and zero-based pages;
+Flutter's native one-based saved page is converted in both directions.
 
-The existing content database download server and its export remain in place.
-This adds the bookmark API to the same Python container with the same 128 MiB
-memory limit. User state lives in `mobile-db/state`, outside the public `/export`
-directory. Do not delete the state directory: it contains the token, revision
-history and deletion tombstones.
+## Install
+
+Merge the change into dev first. On the Pi:
 
 ```sh
 cd ~/violet
-curl -fsSL https://raw.githubusercontent.com/pingpingjinping/violet-release/codex/bookmark-sync/mobile-db/install.sh -o /tmp/violet-bookmark-sync-install.sh
+curl -fsSL https://raw.githubusercontent.com/pingpingjinping/violet-release/dev/mobile-db/install.sh -o /tmp/violet-bookmark-sync-install.sh
 sh /tmp/violet-bookmark-sync-install.sh
 ```
 
-The installer downloads all files first, backs up existing source files, updates
-the Python server, rebuilds the web image, and prints the shared token. This
-does not copy or overwrite either user.db. It requires Internet access on the
-WalnutPi for GitHub downloads and Docker builds. The original Docker Compose
-configuration, hsync and graph profile are preserved. It does not restart hsync.
+The installer downloads source first, backs up replaced files, updates the existing
+Python server and rebuilds web. It prints the existing shared token. No user.db is
+copied or overwritten. The content database, hsync and graph profile remain in place.
+The same Python container retains its 128 MiB memory limit. Persistent state lives
+in mobile-db/state outside the public export folder. Keep this folder: it stores
+the token, bookmark revisions, deletion tombstones and shared records.
 
-## App installation
+Build the updated iOS IPA using the existing workflow and install over the existing
+app with the same signing identity. Keep the exported user.db backup. Do not
+uninstall the app. Open Settings → 앱·웹 기록 동기화, enter
+http://YOUR_PI_HOST:3002 and the token, select daily/weekly and press 지금 동기화.
+Then reload the web app at http://YOUR_PI_HOST:3001, enter the same token in Sync
+settings and press Sync now. Close/reload old web tabs for the IndexedDB upgrade.
+Sync the app first to seed its existing records, then the web.
 
-Merge the change into the fork's dev branch and run its Build iOS IPA workflow.
-Install the IPA over the existing app using the same bundle ID/signing account.
-Keep the exported user.db backup; do not uninstall the app to install the update.
-On the app's settings page choose "앱·웹 작품 북마크 동기화", enter the token,
-select the interval, and press "지금 동기화" once. This seeds the server from
-the app's existing bookmarks.
+Automatic exchanges occur on launch/foreground after one or seven days since the
+last successful exchange. Sync now bypasses the interval. This is not continuous
+or exact-time iOS background scheduling. Badges are current as of the last sync;
+unsynchronized/offline changes on another device cannot be detected. A device
+kept open all day can use Sync now. Failures preserve all local data and the
+previous shared cache, and failed activity exchanges remain due for retry.
 
-## Web setup
+## Storage and consistency
 
-Open http://YOUR_PI_HOST:3001/settings in the usual browser, reload the updated
-web app, enter the same token in the bookmark sync section, and press Sync now.
-Use this exact LAN origin for the Python server's CORS configuration. The token
-is kept on the device and is never built into the IPA or JavaScript bundle.
-The API uses LAN HTTP, like the existing content download server; HTTPS setup
-is outside this change.
+Bookmark requests use persistent UUID receipts, revisions and tombstones. Empty
+clients pull existing bookmarks rather than deleting them. A stale conflicting
+operation cannot override a newer server change. Local bookmark edits made during
+an exchange remain pending.
 
-## Conflict and retry behavior
+Activity requests are naturally idempotent: kind/device/work is a unique key and
+older snapshots cannot replace a newer timestamp. Each device uploads only its
+own native reading sessions and completed download jobs. Received records live
+in a separate SQLite/IndexedDB cache, preventing echo uploads and fake local files.
+Cache replacement is transactional and never overwrites local in-flight edits.
 
-Each client stores a last acknowledged bookmark set and server revision.
-Only changes relative to that set are sent, so an empty web browser does not
-delete the initial app data. The server retains tombstones, and a stale client
-cannot override a change made after its acknowledged revision. When a stale
-operation conflicts, the newer server change wins. A fresh acknowledged client
-can intentionally add a deleted bookmark again.
-
-Requests have persistent UUIDs and receipts. A lost response can be retried
-without applying the same operation again. Each client's bookmark update and
-new checkpoint commit atomically in its local database. Local edits made during
-the network request remain local and are sent on the next sync. Server resets
-are rejected instead of silently applying old checkpoints to a new empty DB.
+The API uses a shared local token over LAN HTTP, like the existing DB server.
+Do not expose it publicly. No private database, token, work-ID list or concrete
+LAN address is committed to GitHub. The server derives the DB manifest URL from
+the requested host; web CORS allows the same hostname at port 3001.
 
 ## Validation
 
 ```sh
-python -m unittest discover -s tests -p test_bookmark_sync.py -v
+python -m unittest discover -s tests -p 'test_*sync.py' -v
 ```
 
-The Bookmark sync checks workflow also builds violet-web and analyzes the two
-new Flutter files. Verify on devices: initial app upload, empty web pull, add
-on web and pull on app, delete on app and pull on web, offline edits, and retry.
-Automatic checks do not replace an actual iPhone installation test.
-
-In the app sync settings, enter http://YOUR_PI_HOST:3002 as the server address.
+The checks workflow runs server integration tests, builds web, exercises the real
+web sync services against fake IndexedDB and mocked HTTP, and analyzes changed
+Flutter files. Web tests cover completed-only uploads, remote-only history/download
+IDs, separation from real local jobs, due intervals, offline retry and edits during
+an exchange. Device checks are still necessary: app-first import, web pull,
+bidirectional read progress, both download origins, duplicate confirmation,
+offline edits, and iPhone upgrade with existing data.

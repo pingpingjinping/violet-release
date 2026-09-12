@@ -107,7 +107,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
         ..addAll([
           ListTile(
             leading: const Icon(Icons.sync),
-            title: const Text('앱·웹 작품 북마크 동기화'),
+            title: const Text('앱·웹 기록 동기화'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(
               context,

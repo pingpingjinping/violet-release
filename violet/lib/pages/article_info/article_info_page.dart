@@ -26,6 +26,7 @@ import 'package:violet/context/modal_bottom_sheet_context.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/database/user/bookmark.dart';
 import 'package:violet/database/user/download.dart';
+import 'package:violet/services/activity_sync.dart';
 import 'package:violet/database/user/record.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
@@ -348,6 +349,11 @@ class ArticleInfoPage extends StatelessWidget {
           true) {
         return;
       }
+    }
+
+    await ActivitySync.load();
+    if (ActivitySync.downloadedOrigins(data.queryResult.id().toString()).contains('web')) {
+      if (await showYesNoDialog(context, '웹에서 다운로드한 기록이 있습니다. 이 기기에서도 다운로드할까요?') != true) return;
     }
 
     showToast(
@@ -1196,3 +1202,4 @@ class _RelatedArea extends StatelessWidget {
     );
   }
 }
+

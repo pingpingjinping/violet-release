@@ -1,3 +1,4 @@
+import { useArticleActivity } from '../../hooks/useSharedActivity';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,8 @@ export function ArticleCard({ article, viewMode = 'grid', aiScore, aiDescription
   const navigate = useNavigate();
   const { data: thumbnailUrl } = useThumbnail(article.Id);
   const { data: isBookmarked } = useIsBookmarked(String(article.Id));
+  const { downloads: sharedDownloads, read: sharedRead } = useArticleActivity(String(article.Id));
+  const origins = [...new Set(sharedDownloads.map(r => r.origin))];
   const toggleBookmark = useToggleBookmark();
   const startDownload = useStartDownload();
   const retryDownload = useRetryDownload();
@@ -128,7 +131,7 @@ export function ArticleCard({ article, viewMode = 'grid', aiScore, aiDescription
           ) : (
             <div className={styles.noImage}>{t('article.noImage')}</div>
           )}
-          {isDownloadsPage ? (
+          {isDownloadsPage && downloadRecord ? (
             <button
               className={`${styles.downloadBtn} ${styles.deleteBtn}`}
               onClick={handleDeleteDownload}
@@ -205,6 +208,11 @@ export function ArticleCard({ article, viewMode = 'grid', aiScore, aiDescription
         </div>
         <div className={styles.info}>
           <div className={styles.title}>{article.Title}</div>
+          {(origins.length > 0 || sharedRead) && <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem' }}>
+            {origins.map(origin => t('activity.downloaded', { source: t(`activity.${origin}`) })).join(' / ')}
+            {origins.length > 0 && sharedRead ? ' · ' : ''}
+            {sharedRead && t('activity.read', { page: sharedRead.page + 1 })}
+          </div>}
           <div className={styles.meta}>
             <span
               className={`${styles.articleId} ${styles.clickable}`}
@@ -314,3 +322,4 @@ export function ArticleCard({ article, viewMode = 'grid', aiScore, aiDescription
     </>
   );
 }
+

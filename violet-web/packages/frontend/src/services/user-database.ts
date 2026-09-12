@@ -1,5 +1,5 @@
 const DB_NAME = 'violet-user-database';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export const USER_STORES = {
   bookmarkGroups: 'bookmark-groups',
@@ -8,6 +8,7 @@ export const USER_STORES = {
   bookmarkCrops: 'bookmark-crops',
   readHistory: 'read-history',
   bookmarkSync: 'bookmark-sync',
+  sharedActivity: 'shared-activity',
 } as const;
 
 type UserStoreName = (typeof USER_STORES)[keyof typeof USER_STORES];
@@ -31,6 +32,7 @@ function openUserDB(): Promise<IDBDatabase> {
 
     request.onsuccess = () => {
       dbInstance = request.result;
+      dbInstance.onversionchange = () => { dbInstance?.close(); dbInstance = null; };
       dbInstance.onclose = () => {
         dbInstance = null;
       };
@@ -124,7 +126,7 @@ export async function deleteUserItem(storeName: UserStoreName, id: number): Prom
   });
 }
 
-export async function replaceUserItems<T extends { Id: number }>(
+export async function replaceUserItems<T extends { Id: number | string }>(
   storeName: UserStoreName,
   items: T[],
 ): Promise<void> {

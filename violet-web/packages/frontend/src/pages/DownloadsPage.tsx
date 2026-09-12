@@ -137,6 +137,7 @@ export function DownloadsPage() {
 
   return (
     <div className={styles.page}>
+      <p style={{ color: 'var(--color-text-secondary)' }}>{t('activity.recordOnly')}</p>
       {!isMobile && (
         <LocalSearchSection
           basePath="/downloads"
@@ -192,3 +193,4 @@ export function DownloadsPage() {
     </div>
   );
 }
+

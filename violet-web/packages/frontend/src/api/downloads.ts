@@ -1,4 +1,5 @@
 import type { DownloadRecord } from '@violet-web/shared';
+import { getSharedActivity } from '../services/activity-sync';
 import { api } from './client';
 
 export interface DownloadsResponse {
@@ -17,7 +18,7 @@ export async function getDownloads(page = 0, pageSize = 30): Promise<DownloadsRe
 
 export async function getDownloadIds(): Promise<string[]> {
   const { data } = await api.get<{ articleIds: string[] }>('/downloads/ids');
-  return data.articleIds;
+  return [...new Set([...data.articleIds, ...(await getSharedActivity()).filter(r => r.kind === 'download').map(r => r.article)])];
 }
 
 export async function getDownload(id: number): Promise<DownloadRecord> {
@@ -45,3 +46,4 @@ export async function checkDownloaded(articleId: string): Promise<boolean> {
   );
   return data.downloaded;
 }
+

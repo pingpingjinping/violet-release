@@ -225,7 +225,7 @@ class _ViewerPageState extends State<ViewerPage> {
         _inactivateTime = DateTime.now();
         await (await User.getInstance()).updateUserLog(
           _pageInfo.id,
-          c.page.value,
+          c.page.value + 1,
         );
       },
       resumeCallBack: () async {
@@ -382,3 +382,4 @@ class _ViewerPageState extends State<ViewerPage> {
     );
   }
 }
+
