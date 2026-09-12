@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:violet/pages/settings/shared_activity_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:violet/services/bookmark_sync.dart';
+import 'package:violet/widgets/shared_activity_badge.dart';
 
 class BookmarkSyncPage extends StatefulWidget {
   const BookmarkSyncPage({super.key});
@@ -79,6 +80,20 @@ class _BookmarkSyncPageState extends State<BookmarkSyncPage> {
       children: [
         const Text(
           '선택한 주기가 지난 뒤 앱을 열면 작품 북마크·읽은 기록·완료한 다운로드 기록을 동기화합니다. 폴더·작가 북마크·다운로드 파일은 기기에 유지됩니다. 새 북마크는 미분류 폴더에 들어갑니다.',
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: SharedActivityBadge.visible,
+          builder: (context, visible, _) => SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('작품 카드에 읽음·다운로드 기록 표시'),
+            subtitle: const Text('꺼도 기록 동기화는 계속됩니다.'),
+            value: visible,
+            onChanged: _loaded && !_busy
+                ? (value) async {
+                    await SharedActivityBadge.setVisible(value);
+                  }
+                : null,
+          ),
         ),
         const SizedBox(height: 16),
         TextField(

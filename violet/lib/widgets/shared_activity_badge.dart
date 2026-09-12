@@ -1,8 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:violet/services/activity_sync.dart';
+import 'package:violet/settings/settings.dart';
 
 class SharedActivityBadge extends StatefulWidget {
+  static const _visibilityKey = 'show_shared_activity_badges';
+  static final visible = ValueNotifier<bool>(
+    Settings.prefs.getBool(_visibilityKey) ?? true,
+  );
+
+  static Future<void> setVisible(bool value) async {
+    await Settings.prefs.setBool(_visibilityKey, value);
+    visible.value = value;
+  }
+
   final String article;
   const SharedActivityBadge({super.key, required this.article});
   @override
@@ -19,7 +30,15 @@ class _SharedActivityBadgeState extends State<SharedActivityBadge> {
   @override
   Widget build(
     BuildContext context,
-  ) => ValueListenableBuilder<List<Map<String, dynamic>>>(
+  ) => ValueListenableBuilder<bool>(
+    valueListenable: SharedActivityBadge.visible,
+    builder: (context, visible, _) => visible
+        ? _buildBadge(context)
+        : const SizedBox.shrink(),
+  );
+
+  Widget _buildBadge(BuildContext context) =>
+      ValueListenableBuilder<List<Map<String, dynamic>>>(
     valueListenable: ActivitySync.records,
     builder: (context, rows, _) {
       final origins = ActivitySync.downloadedOrigins(widget.article);
