@@ -36,7 +36,7 @@ class ServerConfig {
         host.startsWith('192.168.') || host.startsWith('10.') ||
         (parts.length == 4 && parts[0] == '172' &&
           (int.tryParse(parts[1]) ?? 0) >= 16 && (int.tryParse(parts[1]) ?? 0) <= 31);
-    if (!private) return url;
+    if (!private && host != Uri.parse(base).host) return url;
     return endpoint(databaseBase(base), uri.path) + (uri.hasQuery ? '?${uri.query}' : '');
   }
 }

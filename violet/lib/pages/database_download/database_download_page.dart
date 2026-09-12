@@ -1,3 +1,4 @@
+import 'package:violet/services/server_config.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -244,6 +245,7 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       await prefs.setInt('db_exists', 1);
       await prefs.setString('databasetype', widget.dbType!);
       if (widget.dbType! != 'dummy') {
+        await prefs.setString('content-snapshot-server', ServerConfig.webBase);
         await prefs.setInt('content-snapshot-version', SyncManager.getLatestDB().timestamp);
       } else {
         await prefs.remove('content-snapshot-version');

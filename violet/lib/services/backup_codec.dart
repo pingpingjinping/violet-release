@@ -82,7 +82,9 @@ void validateBackup(Map<String, dynamic> payload) {
         if (!['read', 'download'].contains(row['Kind']) || row['Device'] is! String ||
             row['Article'] is! String || !RegExp(r'^\d{1,20}$').hasMatch(row['Article'] as String) ||
             !['app', 'web'].contains(row['Origin']) || row['Timestamp'] is! int ||
-            row['Page'] is! int || row['Type'] is! int) {
+            row['Page'] is! int || row['Type'] is! int ||
+            (row['Timestamp'] as int) <= 0 || (row['Page'] as int) < 0 ||
+            (row['Page'] as int) > 1000000 || ![0, 1].contains(row['Type'])) {
           throw const FormatException('잘못된 공유 기록입니다.');
         }
       }

@@ -21,6 +21,7 @@ void main() {
     expect(ServerConfig.databaseBase('http://192.168.1.20:3001'), 'http://192.168.1.20:3002');
     expect(ServerConfig.downloadUrl('http://192.168.0.39:3002/rawdata-korean.db', 'http://192.168.1.20:3001'), 'http://192.168.1.20:3002/rawdata-korean.db');
     expect(ServerConfig.downloadUrl('http://localhost:3002/rawdata-korean.db', 'https://example.com/violet'), 'https://example.com/violet/rawdata-korean.db');
+    expect(ServerConfig.downloadUrl('http://example.com/rawdata-korean.db', 'https://example.com'), 'https://example.com/rawdata-korean.db');
     expect(ServerConfig.downloadUrl('https://cdn.example.com/db', 'http://192.168.1.20:3001'), 'https://cdn.example.com/db');
     expect(() => ServerConfig.normalize('https://user:pass@example.com'), throwsFormatException);
     expect(() => ServerConfig.normalize('http://example.com?token=x'), throwsFormatException);

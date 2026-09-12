@@ -45,9 +45,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   Future<void> _save() async {
     try {
       final base = ServerConfig.normalize(_address.text);
-      await Settings.prefs.setString('content_server_url', ServerConfig.apiBase(base));
+      if (!await Settings.prefs.setString('content_server_url', ServerConfig.apiBase(base))) throw const FormatException('주소 저장에 실패했습니다.');
       if (mounted) setState(() => _message = '저장했습니다. DB 갱신은 다음 앱 시작 시 확인합니다. 개인 기록 동기화 서버는 변경하지 않았습니다.');
-    } on FormatException catch (e) { setState(() => _message = e.message.toString()); }
+    } on FormatException catch (e) { if (mounted) setState(() => _message = e.message.toString()); }
   }
 
   @override

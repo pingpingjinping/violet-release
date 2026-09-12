@@ -85,7 +85,15 @@ class PiBackup {
     try {
       final response = await client.get(Uri.parse(ServerConfig.endpoint(base, 'api/backups')), headers: headers).timeout(const Duration(seconds: 15));
       _check(response);
-      return (jsonDecode(response.body)['backups'] as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
+      final rows = (jsonDecode(response.body)['backups'] as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
+      for (final row in rows) {
+        if (row['id'] is! String || !RegExp(r'^[0-9a-f-]{36}$').hasMatch(row['id'] as String) ||
+            row['createdAt'] is! int || row['size'] is! int || row['userAppId'] is! String ||
+            row['sha256'] is! String || !RegExp(r'^[0-9a-f]{64}$').hasMatch(row['sha256'] as String)) {
+          throw const FormatException('서버의 백업 목록 형식이 올바르지 않습니다.');
+        }
+      }
+      return rows;
     } finally { client.close(); }
   }
 
@@ -107,7 +115,9 @@ class PiBackup {
       }
       final data = bytes.takeBytes();
       if (sha256.convert(data).toString() != meta['sha256']) throw const FormatException('백업 파일 검사에 실패했습니다.');
-      return await compute(decodeBackup, data);
+      final payload = await compute(decodeBackup, data);
+      if (payload['userAppId'] != meta['userAppId']) throw const FormatException('백업 ID 정보가 파일과 일치하지 않습니다.');
+      return payload;
     } finally { client.close(); }
   }
 
@@ -123,15 +133,25 @@ class PiBackup {
     await create();
     final manager = await CommonUserDatabase.getInstance();
     final prefs = await SharedPreferences.getInstance();
-    final oldId = prefs.getString('fa_userid') ?? '';
-    // Preference update is rolled back if SQLite import fails.
-    if (!await prefs.setString('fa_userid', payload['userAppId'] as String)) throw const FormatException('User App ID 저장에 실패했습니다.');
-    try { await restoreBackupTables(manager.db!, payload); }
-    catch (_) { await prefs.setString('fa_userid', oldId); rethrow; }
+    final oldId = prefs.getString('fa_userid');
+    final oldAuto = prefs.getBool('auto_record_sync') ?? true;
+    if (!await prefs.setBool('auto_record_sync', false)) throw const FormatException('동기화 설정 저장에 실패했습니다.');
+    try {
+      if (!await prefs.setString('fa_userid', payload['userAppId'] as String)) throw const FormatException('User App ID 저장에 실패했습니다.');
+      await restoreBackupTables(manager.db!, payload);
+    } catch (_) {
+      if (oldId == null) { await prefs.remove('fa_userid'); }
+      else { await prefs.setString('fa_userid', oldId); }
+      await prefs.setBool('auto_record_sync', oldAuto);
+      rethrow;
+    }
     Settings.userAppId = payload['userAppId'] as String;
-    await prefs.setBool('auto_record_sync', false);
     (await User.getInstance()).clearCache();
-    await ActivitySync.reload();
+    try { await ActivitySync.reload(); }
+    catch (_) {
+      ActivitySync.records.value = ((payload['tables'] as Map)['SharedActivity'] as List? ?? [])
+          .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+    }
     BookmarkSync.changes.value++;
     return rollback.path;
   });

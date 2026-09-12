@@ -6,9 +6,11 @@ import os
 from pathlib import Path
 import re
 import secrets
+import sqlite3
 import threading
 import time
 import uuid
+import zlib
 
 MAX_UPLOAD = 16 * 1024 * 1024
 MAX_RAW = 128 * 1024 * 1024
@@ -105,8 +107,11 @@ class BackupStore:
         except FileNotFoundError:
             handler.send_error(404, 'Backup not found')
             return
-        except (ValueError, EOFError, gzip.BadGzipFile):
+        except (ValueError, EOFError, gzip.BadGzipFile, zlib.error):
             handler.send_error(400, 'Invalid or oversized gzip backup')
+            return
+        except (OSError, sqlite3.Error):
+            handler.send_error(500, 'Backup storage failed')
             return
         body = json.dumps(result).encode()
         handler.send_response(200)

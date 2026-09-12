@@ -8,9 +8,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/other/dialogs.dart';
-import 'package:violet/pages/common/toast.dart';
 import 'package:violet/server/community/session.dart';
-import 'package:violet/server/violet.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/widgets/theme_switchable_state.dart';
 

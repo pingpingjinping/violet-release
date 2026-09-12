@@ -77,7 +77,7 @@ class _PiBackupPageState extends State<PiBackupPage> {
         const SizedBox(height: 12), Text(_message),
         for (final row in _backups) ListTile(
           title: Text(DateTime.fromMillisecondsSinceEpoch((row['createdAt'] as int) * 1000).toLocal().toString().split('.').first),
-          subtitle: Text('ID: ${row["userAppId"]}\n압축 ${(row["size"] as num / 1048576).toStringAsFixed(2)}MiB'),
+          subtitle: Text('ID: ${row["userAppId"]}\n압축 ${((row["size"] as num) / 1048576).toStringAsFixed(2)}MiB'),
           trailing: const Icon(Icons.restore), onTap: _busy ? null : () => _restore(row)),
       ]),
     ),
