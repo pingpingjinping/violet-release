@@ -15,6 +15,8 @@ import 'package:violet/version/sync.dart';
 /// Complete Korean snapshots have their own version, separate from bookmarks
 /// and incremental chunk synchronization. User databases are never replaced.
 class ContentDbSync {
+  static const lastSuccessfulSyncKey = 'content-snapshot-synced-at';
+
   static Future<bool>? _inFlight;
   static bool _checkedThisSession = false;
 
@@ -64,13 +66,10 @@ class ContentDbSync {
     required bool Function() canApply,
     void Function(String stage, int received, int total)? onProgress,
   }) {
-    return _inFlight ??= _exchange(
-      canApply,
-      onProgress,
-      rethrowErrors: true,
-    ).whenComplete(() {
-      _inFlight = null;
-    });
+    return _inFlight ??= _exchange(canApply, onProgress, rethrowErrors: true)
+        .whenComplete(() {
+          _inFlight = null;
+        });
   }
 
   static Future<bool> _exchange(
@@ -187,6 +186,10 @@ class ContentDbSync {
       await prefs.setString(
         'databasesync',
         DateTime.fromMillisecondsSinceEpoch(version * 1000).toString(),
+      );
+      await prefs.setInt(
+        lastSuccessfulSyncKey,
+        DateTime.now().millisecondsSinceEpoch,
       );
       return true;
     } catch (error) {

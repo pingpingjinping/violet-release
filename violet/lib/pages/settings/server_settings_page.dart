@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:violet/services/content_db_sync.dart';
 import 'package:violet/services/server_config.dart';
 import 'package:violet/settings/settings.dart';
@@ -14,8 +15,48 @@ class ServerSettingsPage extends StatefulWidget {
 
 class _ServerSettingsPageState extends State<ServerSettingsPage> {
   final _address = TextEditingController(text: ServerConfig.webBase);
+  final _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   bool _busy = false;
+  int? _installedDbVersion;
+  DateTime? _lastDbSync;
   String _message = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDbStatus();
+  }
+
+  void _loadDbStatus() {
+    final version =
+        Settings.prefs.getInt('content-snapshot-version') ??
+        Settings.prefs.getInt('synclatest');
+    final lastSyncMillis = Settings.prefs.getInt(
+      ContentDbSync.lastSuccessfulSyncKey,
+    );
+    if (!mounted) return;
+    setState(() {
+      _installedDbVersion = version;
+      _lastDbSync = lastSyncMillis == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(lastSyncMillis);
+    });
+  }
+
+  String _formatDateTime(DateTime value) =>
+      _dateTimeFormat.format(value.toLocal());
+
+  String get _dbVersionLabel => _installedDbVersion?.toString() ?? '기록 없음';
+
+  String get _dbReleaseTimeLabel => _installedDbVersion == null
+      ? '기록 없음'
+      : _formatDateTime(
+          DateTime.fromMillisecondsSinceEpoch(_installedDbVersion! * 1000),
+        );
+
+  String get _lastDbSyncLabel => _lastDbSync == null
+      ? '기록 없음 (다음 DB 적용부터 기록)'
+      : _formatDateTime(_lastDbSync!);
 
   @override
   void dispose() {
@@ -208,9 +249,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
 
       if (mounted) setState(() => _message = '한국어 DB 스냅샷 생성 대기 중…');
-      final snapshotDeadline = DateTime.now().add(
-        const Duration(seconds: 90),
-      );
+      final snapshotDeadline = DateTime.now().add(const Duration(seconds: 90));
       while (DateTime.now().isBefore(snapshotDeadline)) {
         await Future<void>.delayed(const Duration(seconds: 2));
         final currentVersion = await ContentDbSync.remoteVersion();
@@ -228,6 +267,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         },
       );
       if (mounted) {
+        _loadDbStatus();
         setState(
           () => _message = updated
               ? 'Pi와 앱의 작품 DB를 최신 버전으로 적용했습니다.'
@@ -256,6 +296,27 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       children: [
         const Text(
           '내 Pi 또는 호환되는 Violet 서버 주소를 입력하세요. Pi 기본 포트는 웹/API 3001, DB 3002입니다. 다른 포트나 HTTPS 주소는 같은 주소 아래에서 각 기능을 제공해야 합니다.',
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '앱 작품 DB 상태',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text('DB 버전: $_dbVersionLabel'),
+                const SizedBox(height: 4),
+                Text('DB 배포 시각: $_dbReleaseTimeLabel'),
+                const SizedBox(height: 4),
+                Text('마지막 앱 DB 동기화: $_lastDbSyncLabel'),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         TextField(

@@ -21,6 +21,7 @@ import 'package:violet/database/query.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/common/toast.dart';
+import 'package:violet/services/content_db_sync.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/version/sync.dart';
 
@@ -250,8 +251,13 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
           'content-snapshot-version',
           SyncManager.getLatestDB().timestamp,
         );
+        await prefs.setInt(
+          ContentDbSync.lastSuccessfulSyncKey,
+          DateTime.now().millisecondsSinceEpoch,
+        );
       } else {
         await prefs.remove('content-snapshot-version');
+        await prefs.remove(ContentDbSync.lastSuccessfulSyncKey);
       }
       if (widget.dbType! == 'global') {
         await prefs.setString(
