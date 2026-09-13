@@ -12,8 +12,8 @@ class ActiveTabScope extends InheritedNotifier<ValueNotifier<int>> {
     super.key,
     required this.tabIndex,
     required ValueNotifier<int> activeTab,
-    required super.child,
-  }) : super(notifier: activeTab);
+    required Widget child,
+  }) : super(notifier: activeTab, child: child);
 
   static bool isActive(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<ActiveTabScope>();
