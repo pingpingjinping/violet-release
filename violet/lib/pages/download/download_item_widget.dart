@@ -755,7 +755,7 @@ class _FileThumbnailWidget extends StatelessWidget {
     }
 
     return SizedBox(
-      width: showDetail ? 100 : double.infinity;
+      width: showDetail ? 100 : double.infinity,
       child: ClipRRect(
         borderRadius: showDetail
             ? const BorderRadius.horizontal(left: Radius.circular(5.0))
