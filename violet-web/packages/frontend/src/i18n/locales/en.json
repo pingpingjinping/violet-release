@@ -4,6 +4,13 @@
   },
   "nav": {
     "home": "Home",
+    "hot": "Hot",
+    "messageSearch": "Message Search",
+    "llmSearch": "LLM Search",
+    "keywordGraph": "Keyword Graph",
+    "workExperiment": "Work Experiment",
+    "authorSimilarity": "Similar Authors",
+    "activity": "Activity",
     "bookmarks": "Bookmarks",
     "cropBookmarks": "Crops",
     "history": "History",

@@ -4,6 +4,13 @@
   },
   "nav": {
     "home": "홈",
+    "hot": "인기",
+    "messageSearch": "대사 검색",
+    "llmSearch": "LLM 검색",
+    "keywordGraph": "키워드 그래프",
+    "workExperiment": "작품 실험실",
+    "authorSimilarity": "유사 작가",
+    "activity": "활동 기록",
     "bookmarks": "북마크",
     "cropBookmarks": "크롭",
     "history": "기록",
