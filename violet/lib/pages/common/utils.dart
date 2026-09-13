@@ -65,39 +65,33 @@ Future showArticleInfoRaw({
     defaultShowHeight = (height * 0.85).toInt();
   }
 
-  // https://github.com/flutter/flutter/issues/67219
+  // Use a single draggable layer. Nesting a DraggableScrollableSheet inside
+  // the modal made the first downward gesture resize the preview instead of
+  // dismissing it.
+  final controller = ScrollController();
   Provider<ArticleInfo>? cache;
-  showModalBottomSheet(
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
-    // route sheet and the article list compete for the first downward drag.
-    enableDrag: false,
-    builder: (_) {
-      return DraggableScrollableSheet(
-        initialChildSize: defaultShowHeight / height,
-        minChildSize: 400 / height,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) {
-          cache ??= Provider<ArticleInfo>.value(
-            value: ArticleInfo.fromArticleInfo(
-              queryResult: queryResult,
-              thumbnail: thumbnail,
-              headers: headers,
-              heroKey: heroKey,
-              isBookmarked: isBookmarked,
-              controller: controller,
-              usableTabList: usableTabList,
-              lockRead: lockRead,
-            ),
-            child: const ArticleInfoPage(key: ObjectKey(pageKey)),
-          );
-          return cache!;
-        },
-      );
-    },
+    enableDrag: true,
+    builder: (_) => FractionallySizedBox(
+      heightFactor: defaultShowHeight / height,
+      child: cache ??= Provider<ArticleInfo>.value(
+        value: ArticleInfo.fromArticleInfo(
+          queryResult: queryResult,
+          thumbnail: thumbnail,
+          headers: headers,
+          heroKey: heroKey,
+          isBookmarked: isBookmarked,
+          controller: controller,
+          usableTabList: usableTabList,
+          lockRead: lockRead,
+        ),
+        child: const ArticleInfoPage(key: ObjectKey(pageKey)),
+      ),
+    ),
   );
+  controller.dispose();
 }
 
 Future<VioletImageProvider> getImageProviderFromId(int id) async {
@@ -203,35 +197,27 @@ Future<void> showArticleInfoNotFound(
   final isBookmarked = await (await Bookmark.getInstance()).isBookmark(id);
 
   if (!context.mounted) return;
+  final controller = ScrollController();
   Provider<ArticleInfo>? cache;
-  showModalBottomSheet(
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
-    // route sheet and the article list compete for the first downward drag.
-    enableDrag: false,
-    builder: (_) {
-      return DraggableScrollableSheet(
-        initialChildSize: defaultShowHeight / height,
-        minChildSize: 400 / height,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) {
-          cache ??= Provider<ArticleInfo>.value(
-            value: ArticleInfo.fromArticleInfo(
-              queryResult: fallbackQueryResult,
-              thumbnail: null,
-              headers: null,
-              heroKey: heroKey,
-              isBookmarked: isBookmarked,
-              controller: controller,
-              lockRead: true,
-            ),
-            child: const ArticleInfoPage(key: ObjectKey(pageKey)),
-          );
-          return cache!;
-        },
-      );
-    },
+    enableDrag: true,
+    builder: (_) => FractionallySizedBox(
+      heightFactor: defaultShowHeight / height,
+      child: cache ??= Provider<ArticleInfo>.value(
+        value: ArticleInfo.fromArticleInfo(
+          queryResult: fallbackQueryResult,
+          thumbnail: null,
+          headers: null,
+          heroKey: heroKey,
+          isBookmarked: isBookmarked,
+          controller: controller,
+          lockRead: true,
+        ),
+        child: const ArticleInfoPage(key: ObjectKey(pageKey)),
+      ),
+    ),
   );
+  controller.dispose();
 }

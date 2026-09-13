@@ -31,10 +31,53 @@ class ContentDbSync {
     });
   }
 
+  /// Checks the snapshot advertised by the configured content server.
+  /// Unlike [startup], this can be called repeatedly while a Pi export is
+  /// being regenerated.
+  static Future<int?> remoteVersion() async {
+    final client = http.Client();
+    try {
+      final response = await client
+          .get(Uri.parse(SyncManager.syncInfoURL('main')))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'Snapshot manifest returned HTTP ${response.statusCode}',
+        );
+      }
+      for (final line in response.body.split('\n').reversed) {
+        final fields = line.trim().split(RegExp(r'\s+'));
+        if (fields.length < 3 || fields.first != 'db') continue;
+        final version = int.tryParse(fields[1]);
+        if (version != null && version > 0) return version;
+      }
+      throw const FormatException('Snapshot manifest has no database entry');
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Runs the normal validated download-and-replace flow on demand.
+  /// Manual callers receive failures instead of silently deferring them until
+  /// the next launch.
+  static Future<bool> manual({
+    required bool Function() canApply,
+    void Function(String stage, int received, int total)? onProgress,
+  }) {
+    return _inFlight ??= _exchange(
+      canApply,
+      onProgress,
+      rethrowErrors: true,
+    ).whenComplete(() {
+      _inFlight = null;
+    });
+  }
+
   static Future<bool> _exchange(
     bool Function() canApply,
-    void Function(String stage, int received, int total)? onProgress,
-  ) async {
+    void Function(String stage, int received, int total)? onProgress, {
+    bool rethrowErrors = false,
+  }) async {
     File? temporary;
     final client = http.Client();
     try {
@@ -148,6 +191,7 @@ class ContentDbSync {
       return true;
     } catch (error) {
       Logger.error('[ContentDbSync] Update failed; retry on next launch');
+      if (rethrowErrors) rethrow;
       return false;
     } finally {
       client.close();
