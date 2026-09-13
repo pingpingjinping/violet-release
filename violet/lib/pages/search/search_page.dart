@@ -79,6 +79,13 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
     });
   }
 
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    Get.delete<SearchPageController>(tag: getxId, force: true);
+    super.dispose();
+  }
+
   doInitialSearch() async {
     final generation = _searchGeneration;
 
