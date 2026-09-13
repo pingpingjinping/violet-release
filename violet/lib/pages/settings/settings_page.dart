@@ -1,5 +1,6 @@
 import 'package:violet/pages/settings/server_settings_page.dart';
 import 'package:violet/pages/settings/pi_backup_page.dart';
+import 'package:violet/pages/settings/image_cache_page.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -119,6 +120,15 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.image_outlined),
+            title: const Text('이미지 캐시'),
+            subtitle: const Text('본문·썸네일 용량 확인 및 삭제'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ImageCachePage())),
           ),
           ListTile(
             leading: const Icon(Icons.sync),
