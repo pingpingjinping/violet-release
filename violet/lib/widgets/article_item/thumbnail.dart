@@ -339,10 +339,15 @@ class _DownloadIndicatorWidgetState extends State<DownloadIndicatorWidget> {
             width: 35,
             height: 35,
             child: Icon(
-              MdiIcons.download,
+              Icons.arrow_downward_rounded,
+              size: 32,
+              weight: 800,
               color: widget.greyScale
                   ? const Color(0xFF777777)
                   : const Color(0xFF2196F3),
+              shadows: const [
+                Shadow(color: Colors.black54, blurRadius: 2),
+              ],
             ),
           ),
         ),
