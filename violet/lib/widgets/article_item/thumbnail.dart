@@ -8,7 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:violet/database/user/download.dart';
+import 'package:violet/services/download_service.dart';
 import 'package:violet/settings/settings.dart';
+import 'package:violet/widgets/active_tab_scope.dart';
 import 'package:violet/widgets/article_item/article_list_item_widget_controller.dart';
 
 class ThumbnailWidget extends StatelessWidget {
@@ -21,6 +24,14 @@ class ThumbnailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!ActiveTabScope.isActive(context)) {
+      return SizedBox(
+        width: c.articleListItem.showDetail
+            ? (c.articleListItem.showUltra ? 120 : 100)
+            : null,
+      );
+    }
+
     final result = Obx(() {
       final greyScale =
           c.isLatestRead.value &&
@@ -45,6 +56,10 @@ class ThumbnailWidget extends StatelessWidget {
                     greyScale: greyScale,
                   ),
                   BookmarkIndicatorWidget(getxId: getxId, greyScale: greyScale),
+                  DownloadIndicatorWidget(
+                    articleId: c.articleListItem.queryResult.id(),
+                    greyScale: greyScale,
+                  ),
                   Obx(
                     () => ReadProgressOverlayWidget(
                       imageCount: c.imageCount.value,
@@ -135,6 +150,10 @@ class _ThumbnailImageWidgetState extends State<ThumbnailImageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ActiveTabScope.isActive(context)) {
+      return const ColoredBox(color: Colors.transparent);
+    }
+
     return Hero(
       tag: widget.thumbnailTag,
       child: ValueListenableBuilder<String>(
@@ -255,6 +274,76 @@ class BookmarkIndicatorWidget extends StatelessWidget {
                         ? Colors.black
                         : Colors.white,
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DownloadIndicatorWidget extends StatefulWidget {
+  final int articleId;
+  final bool greyScale;
+
+  const DownloadIndicatorWidget({
+    super.key,
+    required this.articleId,
+    required this.greyScale,
+  });
+
+  @override
+  State<DownloadIndicatorWidget> createState() =>
+      _DownloadIndicatorWidgetState();
+}
+
+class _DownloadIndicatorWidgetState extends State<DownloadIndicatorWidget> {
+  bool _downloaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    DownloadService.instance.changes.addListener(_refresh);
+    unawaited(_refresh());
+  }
+
+  @override
+  void didUpdateWidget(covariant DownloadIndicatorWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.articleId != widget.articleId) unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    final download = await Download.getInstance();
+    final downloaded = download.isDownloadedArticle(widget.articleId, false);
+    if (!mounted || downloaded == _downloaded) return;
+    setState(() => _downloaded = downloaded);
+  }
+
+  @override
+  void dispose() {
+    DownloadService.instance.changes.removeListener(_refresh);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_downloaded) return const SizedBox.shrink();
+
+    return Align(
+      alignment: FractionalOffset.topLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 32),
+        child: Transform.scale(
+          scale: 0.9,
+          child: SizedBox(
+            width: 35,
+            height: 35,
+            child: Icon(
+              MdiIcons.download,
+              color: widget.greyScale
+                  ? const Color(0xFF777777)
+                  : const Color(0xFF2196F3),
+            ),
           ),
         ),
       ),

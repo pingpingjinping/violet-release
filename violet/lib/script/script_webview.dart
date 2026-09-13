@@ -50,6 +50,15 @@ class _ScriptWebViewState extends State<ScriptWebView>
     ScriptWebViewProxy.reload = () => webViewController?.reload();
   }
 
+  @override
+  void dispose() {
+    timer?.cancel();
+    if (ScriptWebViewProxy.reload != null) {
+      ScriptWebViewProxy.reload = null;
+    }
+    super.dispose();
+  }
+
   Future<void> timerCallback(timer) async {
     webViewController?.reload();
   }

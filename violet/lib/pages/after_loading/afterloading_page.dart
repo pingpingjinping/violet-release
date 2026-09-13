@@ -33,6 +33,7 @@ import 'package:violet/update/update_manager.dart';
 import 'package:violet/variables.dart';
 import 'package:violet/version/update_sync.dart';
 import 'package:violet/widgets/patch_note_prompt.dart';
+import 'package:violet/widgets/active_tab_scope.dart';
 import 'package:violet/services/bookmark_sync.dart';
 import 'package:violet/services/download_service.dart';
 
@@ -104,10 +105,20 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
+    _focusNode.dispose();
+    nestedFocusNode.dispose();
+    _activeTab.dispose();
     DownloadService.instance.completed.removeListener(_downloadCompleted);
     _deeplinkSubscription?.cancel();
     _shareSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
   }
 
   @override
@@ -349,6 +360,9 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   final PageController _pageController = PageController(
     initialPage: defaultInitialPage,
   );
+  late final ValueNotifier<int> _activeTab = ValueNotifier<int>(
+    defaultInitialPage,
+  );
   final FocusNode _focusNode = FocusNode();
   final FocusNode nestedFocusNode = FocusNode();
 
@@ -370,11 +384,31 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   );
 
   late final List<Widget> _tabs = [
-    SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
-    HotPage(key: _widgetKeys[1]),
-    BookmarkPage(key: _widgetKeys[2]),
-    DownloadPage(key: _widgetKeys[3]),
-    SettingsPage(key: _widgetKeys[4]),
+    ActiveTabScope(
+      tabIndex: 0,
+      activeTab: _activeTab,
+      child: SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
+    ),
+    ActiveTabScope(
+      tabIndex: 1,
+      activeTab: _activeTab,
+      child: HotPage(key: _widgetKeys[1]),
+    ),
+    ActiveTabScope(
+      tabIndex: 2,
+      activeTab: _activeTab,
+      child: BookmarkPage(key: _widgetKeys[2]),
+    ),
+    ActiveTabScope(
+      tabIndex: 3,
+      activeTab: _activeTab,
+      child: DownloadPage(key: _widgetKeys[3]),
+    ),
+    ActiveTabScope(
+      tabIndex: 4,
+      activeTab: _activeTab,
+      child: SettingsPage(key: _widgetKeys[4]),
+    ),
   ];
 
   Widget _buildBottomNavigationBar(BuildContext context) {
@@ -410,12 +444,18 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
             : null,
         currentIndex: _currentPage,
         onTap: (index) {
-          if (_pageController.page != index) {
-            _pageController.animateToPage(
-              index,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-            );
+          if (_currentPage != index) {
+            final distance = (_currentPage - index).abs();
+            if (distance > 1) {
+              _activeTab.value = index;
+              _pageController.jumpToPage(index);
+            } else {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+              );
+            }
           } else {
             if (_isDoubleTap) {
               // something to do for double tap
@@ -513,6 +553,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
             ),
             onTap: () {
               setState(() {
+                _activeTab.value = page;
                 _pageController.jumpToPage(page);
               });
               Navigator.pop(context);
@@ -667,6 +708,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
                       ? const NeverScrollableScrollPhysics()
                       : null,
                   onPageChanged: (newPage) {
+                    _activeTab.value = newPage;
                     setState(() {});
                   },
                   children: _tabs,

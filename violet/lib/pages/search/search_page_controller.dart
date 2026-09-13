@@ -148,6 +148,16 @@ class SearchPageController extends GetxController {
     }
   }
 
+  @override
+  void onClose() {
+    scrollController?.removeListener(scrollPositionListener);
+    scrollController?.dispose();
+    scrollController = null;
+    itemKeys.clear();
+    _scrollQueue.clear();
+    super.onClose();
+  }
+
   resetItemHeight() => _itemHeight = 0.0;
 
   showErrorToast(String message) {

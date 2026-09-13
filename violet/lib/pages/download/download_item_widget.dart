@@ -24,6 +24,7 @@ import 'package:violet/script/script_manager.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/style/palette.dart';
 import 'package:violet/widgets/article_item/thumbnail.dart';
+import 'package:violet/widgets/active_tab_scope.dart';
 
 class DownloadListItem {
   bool addBottomPadding;
@@ -72,7 +73,7 @@ class DownloadItemWidget extends StatefulWidget {
 class DownloadItemWidgetState extends State<DownloadItemWidget>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
   double scale = 1.0;
   String fav = '';
   int cur = 0;
@@ -97,30 +98,15 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
     _downloadProcedure();
   }
 
-  void _checkLastRead() {
-    User.getInstance().then(
-      (value) => value.getUserLog().then((value) async {
-        final x = value.where(
-          (e) =>
-              e.articleId() == widget.item.url() &&
-              e.lastPage() != null &&
-              e.lastPage()! > 1 &&
-              DateTime.parse(
-                    e.datetimeStart(),
-                  ).difference(DateTime.now()).inDays <
-                  31,
-        );
-        if (x.isEmpty) return;
-        _shouldReload = true;
-
-        if (!disposed) {
-          setState(() {
-            isLastestRead = true;
-            latestReadPage = x.first.lastPage()!;
-          });
-        }
-      }),
-    );
+  Future<void> _checkLastRead() async {
+    final user = await User.getInstance();
+    final log = await user.recentRead(widget.item.url());
+    if (disposed || log == null || (log.lastPage() ?? 0) <= 1) return;
+    _shouldReload = true;
+    setState(() {
+      isLastestRead = true;
+      latestReadPage = log.lastPage()!;
+    });
   }
 
   void _styleCallback(DownloadListItem item) {
@@ -625,7 +611,7 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
   }
 }
 
-class _ThumbnailWidget extends StatelessWidget {
+class _ThumbnailWidget extends StatefulWidget {
   final String? thumbnail;
   final String? thumbnailHeader;
   final String? thumbnailTag;
@@ -641,12 +627,41 @@ class _ThumbnailWidget extends StatelessWidget {
   });
 
   @override
+  State<_ThumbnailWidget> createState() => _ThumbnailWidgetState();
+}
+
+class _ThumbnailWidgetState extends State<_ThumbnailWidget> {
+  Future<(String, Map<String, String>)>? _source;
+
+  @override
+  void didUpdateWidget(covariant _ThumbnailWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.id != widget.id ||
+        oldWidget.thumbnail != widget.thumbnail ||
+        oldWidget.thumbnailHeader != widget.thumbnailHeader) {
+      _source = null;
+    }
+  }
+
+  Future<(String, Map<String, String>)> _loadSource() async {
+    final value = await HitomiManager.getImageList(widget.id.toString());
+    final header = await ScriptManager.runHitomiGetHeaderContent(
+      widget.id.toString(),
+    );
+    return (value.urls[0], header);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!ActiveTabScope.isActive(context)) {
+      return const ColoredBox(color: Colors.transparent);
+    }
+
     return SizedBox(
-      width: showDetail ? 100 : double.infinity,
-      child: thumbnail != null
+      width: widget.showDetail ? 100 : double.infinity,
+      child: widget.thumbnail != null
           ? ClipRRect(
-              borderRadius: showDetail
+              borderRadius: widget.showDetail
                   ? const BorderRadius.horizontal(left: Radius.circular(5.0))
                   : const BorderRadius.all(Radius.circular(5.0)),
               child: _thumbnailImage(),
@@ -655,69 +670,46 @@ class _ThumbnailWidget extends StatelessWidget {
     );
   }
 
+  Widget _networkImage(String url, Map<String, String> headers) {
+    return Hero(
+      tag: widget.thumbnailTag!,
+      child: CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        memCacheWidth: widget.showDetail
+            ? 300
+            : (Settings.useLowPerf.value ? 300 : 600),
+        httpHeaders: headers,
+        imageBuilder: (context, imageProvider) => Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+          ),
+        ),
+        placeholder: (_, __) => _getLoadingAnimation(),
+      ),
+    );
+  }
+
   Widget _thumbnailImage() {
-    if (id == null) {
-      Map<String, String> headers = {};
-      if (thumbnailHeader != null) {
-        var hh = jsonDecode(thumbnailHeader!) as Map<String, dynamic>;
-        for (var element in hh.entries) {
-          headers[element.key] = element.value as String;
+    if (widget.id == null) {
+      final headers = <String, String>{};
+      if (widget.thumbnailHeader != null) {
+        final decoded =
+            jsonDecode(widget.thumbnailHeader!) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          headers[entry.key] = entry.value as String;
         }
       }
-      return Hero(
-        tag: thumbnailTag!,
-        child: CachedNetworkImage(
-          imageUrl: thumbnail!,
-          fit: BoxFit.cover,
-          httpHeaders: headers,
-          imageBuilder: (context, imageProvider) => Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-            ),
-            child: Container(),
-          ),
-          placeholder: (b, c) {
-            return _getLoadingAnimation();
-          },
-        ),
-      );
-    } else {
-      return FutureBuilder(
-        future: HitomiManager.getImageList(id.toString()).then((value) async {
-          var header = await ScriptManager.runHitomiGetHeaderContent(
-            id.toString(),
-          );
-          return (value.urls[0], header);
-        }),
-        builder:
-            (context, AsyncSnapshot<(String, Map<String, String>)> snapshot) {
-              if (!snapshot.hasData || snapshot.data == null) {
-                return _getLoadingAnimation();
-              }
-
-              return Hero(
-                tag: thumbnailTag!,
-                child: CachedNetworkImage(
-                  imageUrl: snapshot.data!.$1,
-                  fit: BoxFit.cover,
-                  httpHeaders: snapshot.data!.$2,
-                  imageBuilder: (context, imageProvider) => Container(
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: imageProvider,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: Container(),
-                  ),
-                  placeholder: (b, c) {
-                    return _getLoadingAnimation();
-                  },
-                ),
-              );
-            },
-      );
+      return _networkImage(widget.thumbnail!, headers);
     }
+
+    return FutureBuilder<(String, Map<String, String>)>(
+      future: _source ??= _loadSource(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return _getLoadingAnimation();
+        return _networkImage(snapshot.data!.$1, snapshot.data!.$2);
+      },
+    );
   }
 
   Widget _getLoadingAnimation() {
@@ -728,17 +720,16 @@ class _ThumbnailWidget extends StatelessWidget {
         fit: BoxFit.fitHeight,
         animation: 'Alarm',
       );
-    } else {
-      return Center(
-        child: SizedBox(
-          width: 30,
-          height: 30,
-          child: CircularProgressIndicator(
-            color: Settings.majorColor.value.withAlpha(150),
-          ),
-        ),
-      );
     }
+    return Center(
+      child: SizedBox(
+        width: 30,
+        height: 30,
+        child: CircularProgressIndicator(
+          color: Settings.majorColor.value.withAlpha(150),
+        ),
+      ),
+    );
   }
 }
 
@@ -759,6 +750,10 @@ class _FileThumbnailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!ActiveTabScope.isActive(context)) {
+      return const ColoredBox(color: Colors.transparent);
+    }
+
     return SizedBox(
       width: showDetail ? 100 : double.infinity,
       child: ClipRRect(
