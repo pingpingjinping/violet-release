@@ -40,7 +40,7 @@ class _ScriptWebViewState extends State<ScriptWebView>
   void initState() {
     super.initState();
 
-    timer = Timer.periodic(const Duration(minutes: 30), timerCallback);
+    timer = Timer.periodic(const Duration(minutes: 1), timerCallback);
 
     // run script readiness probe
     Future.delayed(
