@@ -133,7 +133,8 @@ class _RecordViewPageState extends State<RecordViewPage> {
     _pageLoading = true;
     if (!_initialLoading && mounted) setState(() {});
     final start = _nextLog;
-    final end = (start + _pageSize).clamp(0, _logs.length);
+    final requestedEnd = start + _pageSize;
+    final end = requestedEnd < _logs.length ? requestedEnd : _logs.length;
     final page = _logs.sublist(start, end);
     var localById = <String, QueryResult>{};
 
