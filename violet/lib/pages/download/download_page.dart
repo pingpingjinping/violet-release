@@ -90,6 +90,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   void initState() {
     super.initState();
 
+    doubleTapToTopScrollController = ScrollController()
+      ..addListener(_scrollChanged);
     refresh(immediate: true);
     DownloadService.instance.changes.addListener(refresh);
     indexBarDragListener.dragDetails.addListener(_indexChanged);
@@ -100,6 +102,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     DownloadService.instance.changes.removeListener(refresh);
     _refreshTimer?.cancel();
     indexBarDragListener.dragDetails.removeListener(_indexChanged);
+    doubleTapToTopScrollController?.removeListener(_scrollChanged);
+    doubleTapToTopScrollController?.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -267,8 +272,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
           children: [
             CustomScrollView(
               cacheExtent: MediaQuery.of(context).size.height * 2.5,
-              controller: doubleTapToTopScrollController = ScrollController()
-                ..addListener(_scrollChanged),
+              controller: doubleTapToTopScrollController,
               physics: const BouncingScrollPhysics(),
               slivers: <Widget>[
                 SliverPersistentHeader(
