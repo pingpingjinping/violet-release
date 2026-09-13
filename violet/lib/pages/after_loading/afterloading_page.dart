@@ -21,6 +21,7 @@ import 'package:violet/pages/bookmark/bookmark_page.dart';
 import 'package:violet/pages/common/toast.dart';
 import 'package:violet/pages/common/utils.dart';
 import 'package:violet/pages/download/download_page.dart';
+import 'package:violet/pages/hot/hot_page.dart';
 import 'package:violet/pages/lock/lock_screen.dart';
 import 'package:violet/pages/search/search_page.dart';
 import 'package:violet/pages/segment/double_tap_to_top.dart';
@@ -364,15 +365,16 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
   bool _isDoubleTap = false;
 
   late final List<GlobalKey<State>> _widgetKeys = List.generate(
-    4,
+    5,
     (index) => GlobalKey(),
   );
 
   late final List<Widget> _tabs = [
     SearchPage(key: _widgetKeys[0], focusNode: nestedFocusNode),
-    BookmarkPage(key: _widgetKeys[1]),
-    DownloadPage(key: _widgetKeys[2]),
-    SettingsPage(key: _widgetKeys[3]),
+    HotPage(key: _widgetKeys[1]),
+    BookmarkPage(key: _widgetKeys[2]),
+    DownloadPage(key: _widgetKeys[3]),
+    SettingsPage(key: _widgetKeys[4]),
   ];
 
   Widget _buildBottomNavigationBar(BuildContext context) {
@@ -433,6 +435,7 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
         },
         items: <BottomNavigationBarItem>[
           buildItem(Icons.search, 'search'),
+          buildItem(MdiIcons.fire, 'hot'),
           buildItem(Icons.bookmark, 'bookmark'),
           buildItem(Icons.file_download, 'download'),
           buildItem(Icons.settings, 'settings'),
@@ -560,9 +563,10 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
               ),
             ),
             buildButton(Icons.search, 0, 'search'),
-            buildButton(MdiIcons.bookmark, 1, 'bookmark'),
-            buildButton(MdiIcons.download, 2, 'download'),
-            buildButton(Icons.settings, 3, 'settings'),
+            buildButton(MdiIcons.fire, 1, 'hot'),
+            buildButton(MdiIcons.bookmark, 2, 'bookmark'),
+            buildButton(MdiIcons.download, 3, 'download'),
+            buildButton(Icons.settings, 4, 'settings'),
             const Spacer(),
             Text(
               'Copyright (C) 2020-2024\nby project-violet',
