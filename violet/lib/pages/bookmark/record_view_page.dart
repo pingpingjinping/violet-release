@@ -146,7 +146,9 @@ class _RecordViewPageState extends State<RecordViewPage> {
         for (final result in results) result.id().toString(): result,
       };
     } catch (error, stackTrace) {
-      Logger.error('[RecordViewPage] Local page query failed: $error\n$stackTrace');
+      Logger.error(
+        '[RecordViewPage] Local page query failed: $error\n$stackTrace',
+      );
     }
 
     if (!mounted || currentGeneration != _generation) return;
