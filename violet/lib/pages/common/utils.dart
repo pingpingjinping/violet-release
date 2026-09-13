@@ -70,6 +70,9 @@ Future showArticleInfoRaw({
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
+    // route sheet and the article list compete for the first downward drag.
+    enableDrag: false,
     builder: (_) {
       return DraggableScrollableSheet(
         initialChildSize: defaultShowHeight / height,
@@ -204,6 +207,9 @@ Future<void> showArticleInfoNotFound(
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
+    // route sheet and the article list compete for the first downward drag.
+    enableDrag: false,
     builder: (_) {
       return DraggableScrollableSheet(
         initialChildSize: defaultShowHeight / height,
