@@ -9,6 +9,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flare_flutter/flare_actor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:violet/component/hitomi/hitomi.dart';
 import 'package:violet/database/user/download.dart';
@@ -72,6 +73,10 @@ class DownloadItemWidget extends StatefulWidget {
 
 class DownloadItemWidgetState extends State<DownloadItemWidget>
     with AutomaticKeepAliveClientMixin {
+  static final DateFormat _downloadTimeFormat = DateFormat(
+    'yyyy-MM-dd HH:mm:ss',
+  );
+
   @override
   bool get wantKeepAlive => false;
   double scale = 1.0;
@@ -456,6 +461,13 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
     );
   }
 
+  String _formattedDownloadTime() {
+    final raw = widget.item.dateTime();
+    if (raw == null || raw.isEmpty) return '';
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null ? raw.split('.').first : _downloadTimeFormat.format(parsed);
+  }
+
   Widget buildDetail() {
     var title = widget.item.url();
 
@@ -465,7 +477,7 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
 
     var state = 'None';
     var pp =
-        '${Translations.instance!.trans('date')}: ${widget.item.dateTime()!}';
+        '${Translations.instance!.trans('date')}: ${_formattedDownloadTime()}';
 
     var statecolor = !Settings.themeWhat.value ? Colors.black : Colors.white;
     var statebold = FontWeight.normal;
