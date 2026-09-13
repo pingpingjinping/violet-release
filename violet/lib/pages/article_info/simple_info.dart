@@ -9,7 +9,9 @@ import 'package:flare_flutter/flare_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:violet/database/user/download.dart';
 import 'package:violet/model/article_info.dart';
+import 'package:violet/services/download_service.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/widgets/article_item/image_provider_manager.dart';
 import 'package:violet/widgets/article_item/thumbnail_view_page.dart';
@@ -28,7 +30,13 @@ class SimpleInfoWidget extends StatelessWidget {
       children: <Widget>[
         Row(
           children: [
-            Stack(children: <Widget>[thumbnail(context, data), bookmark(data)]),
+            Stack(
+              children: <Widget>[
+                thumbnail(context, data),
+                bookmark(data),
+                downloadMarker(data),
+              ],
+            ),
             Expanded(
               child: SizedBox(
                 height: size.height,
@@ -151,6 +159,39 @@ class SimpleInfoWidget extends StatelessWidget {
             _flareController.play('Like');
           }
         },
+      ),
+    );
+  }
+
+  Widget downloadMarker(ArticleInfo data) {
+    return Positioned(
+      left: 8,
+      top: 48,
+      width: 40,
+      height: 40,
+      child: ValueListenableBuilder<int>(
+        valueListenable: DownloadService.instance.changes,
+        builder: (context, _, __) => FutureBuilder<Download>(
+          future: Download.getInstance(),
+          builder: (context, snapshot) {
+            final downloaded =
+                snapshot.data?.isDownloadedArticle(
+                  data.queryResult.id(),
+                  false,
+                ) ??
+                false;
+            if (!downloaded) return const SizedBox.shrink();
+            return const Icon(
+              Icons.arrow_downward_rounded,
+              size: 36,
+              weight: 800,
+              color: Color(0xFF2196F3),
+              shadows: [
+                Shadow(color: Colors.black54, blurRadius: 2),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

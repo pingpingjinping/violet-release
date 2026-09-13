@@ -653,6 +653,8 @@ class _ThumbnailWidgetState extends State<_ThumbnailWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Keep the 2.5-screen preload range on this tab without decoding
+    // thumbnails while another root tab is active.
     if (!ActiveTabScope.isActive(context)) {
       return const ColoredBox(color: Colors.transparent);
     }
