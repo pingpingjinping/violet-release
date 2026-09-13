@@ -266,6 +266,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
         child: Stack(
           children: [
             CustomScrollView(
+              cacheExtent: MediaQuery.of(context).size.height * 2.5,
               controller: doubleTapToTopScrollController = ScrollController()
                 ..addListener(_scrollChanged),
               physics: const BouncingScrollPhysics(),
