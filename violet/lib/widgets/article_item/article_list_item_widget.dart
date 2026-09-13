@@ -59,7 +59,7 @@ class _ArticleListItemWidgetState extends State<ArticleListItemWidget>
   late String getxId;
 
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
 
   bool animating = false;
 
