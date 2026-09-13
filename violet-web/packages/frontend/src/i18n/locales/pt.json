@@ -146,7 +146,7 @@
       "ready": "Pronto",
       "notFound": "Não encontrado",
       "lastSync": "Última sincronização:",
-      "lastSyncDb": "Última sincronização (DB):",
+      "lastSyncDb": "Versão do DB:",
       "never": "Nunca",
       "status": "Status:",
       "idle": "Inativo",

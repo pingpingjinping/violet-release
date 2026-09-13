@@ -146,7 +146,7 @@
       "ready": "就绪",
       "notFound": "未找到",
       "lastSync": "最后同步:",
-      "lastSyncDb": "最后同步(DB):",
+      "lastSyncDb": "数据库版本:",
       "never": "从未",
       "status": "状态:",
       "idle": "空闲",
