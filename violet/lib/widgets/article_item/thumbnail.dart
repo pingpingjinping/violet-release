@@ -155,7 +155,7 @@ class _ThumbnailImageWidgetState extends State<ThumbnailImageWidget> {
     }
 
     return Hero(
-      tag: widget.thumbnailTag;
+      tag: widget.thumbnailTag,
       child: ValueListenableBuilder<String>(
         valueListenable: _rebuildValueNotifier,
         builder: (context, value, child) {
