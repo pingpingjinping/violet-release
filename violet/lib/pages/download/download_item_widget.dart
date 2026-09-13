@@ -465,7 +465,9 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
     final raw = widget.item.dateTime();
     if (raw == null || raw.isEmpty) return '';
     final parsed = DateTime.tryParse(raw);
-    return parsed == null ? raw.split('.').first : _downloadTimeFormat.format(parsed);
+    return parsed == null
+        ? raw.split('.').first
+        : _downloadTimeFormat.format(parsed);
   }
 
   Widget buildDetail() {
