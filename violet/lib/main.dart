@@ -47,7 +47,7 @@ Future<void> main() async {
       if (Platform.isAndroid || Platform.isIOS) {
         await FlutterDownloader.initialize();
       }
-      FlareCache.doesPrune = false;
+      FlareCache.doesPrune = true;
       FlutterError.onError = recordFlutterError;
 
       await initUserId();
