@@ -123,8 +123,8 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           ),
           ListTile(
             leading: const Icon(Icons.image_outlined),
-            title: const Text('본문 이미지 캐시'),
-            subtitle: const Text('사용 용량 확인 및 삭제'),
+            title: const Text('이미지 캐시'),
+            subtitle: const Text('본문·썸네일 용량 확인 및 삭제'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ImageCachePage()),
