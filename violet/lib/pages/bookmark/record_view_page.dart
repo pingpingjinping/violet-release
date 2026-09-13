@@ -156,9 +156,7 @@ class _RecordViewPageState extends State<RecordViewPage> {
       for (final log in page) {
         final id = log.articleId();
         _itemIndexById[id] = _items.length;
-        _items.add(
-          RecordArticleItem(readLog: log, queryResult: localById[id]),
-        );
+        _items.add(RecordArticleItem(readLog: log, queryResult: localById[id]));
       }
       _nextLog = end;
       _initialLoading = false;
@@ -271,11 +269,7 @@ class _RecordViewPageState extends State<RecordViewPage> {
             ),
           )
         : _buildRecords(context);
-    return CardPanel.build(
-      context,
-      child: child,
-      enableBackgroundColor: true,
-    );
+    return CardPanel.build(context, child: child, enableBackgroundColor: true);
   }
 
   Widget _buildRecords(BuildContext context) {
@@ -297,41 +291,38 @@ class _RecordViewPageState extends State<RecordViewPage> {
               mainAxisSpacing: 8,
               childAspectRatio: 3 / 4,
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = _items[index];
-                return Padding(
-                  key: ValueKey('record/${item.readLog.articleId()}'),
-                  padding: EdgeInsets.zero,
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        item.isNotFound
-                            ? RecordArticleNotFoundItem(
-                                articleId: item.readLog.articleId(),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = _items[index];
+              return Padding(
+                key: ValueKey('record/${item.readLog.articleId()}'),
+                padding: EdgeInsets.zero,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      item.isNotFound
+                          ? RecordArticleNotFoundItem(
+                              articleId: item.readLog.articleId(),
+                              width: itemWidth,
+                            )
+                          : Provider<ArticleListItem>.value(
+                              value: ArticleListItem.fromArticleListItem(
+                                queryResult: item.queryResult!,
+                                addBottomPadding: false,
+                                showDetail: false,
                                 width: itemWidth,
-                              )
-                            : Provider<ArticleListItem>.value(
-                                value: ArticleListItem.fromArticleListItem(
-                                  queryResult: item.queryResult!,
-                                  addBottomPadding: false,
-                                  showDetail: false,
-                                  width: itemWidth,
-                                  thumbnailTag:
-                                      'record/${item.readLog.articleId()}',
-                                  usableTabList: _usableTabList,
-                                ),
-                                child: const ArticleListItemWidget(),
+                                thumbnailTag:
+                                    'record/${item.readLog.articleId()}',
+                                usableTabList: _usableTabList,
                               ),
-                      ],
-                    ),
+                              child: const ArticleListItemWidget(),
+                            ),
+                    ],
                   ),
-                );
-              },
-              childCount: _items.length,
-            ),
+                ),
+              );
+            }, childCount: _items.length),
           ),
         ),
         if (_pageLoading)
