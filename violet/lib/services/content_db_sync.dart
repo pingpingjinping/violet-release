@@ -66,13 +66,10 @@ class ContentDbSync {
     required bool Function() canApply,
     void Function(String stage, int received, int total)? onProgress,
   }) {
-    return _inFlight ??= _exchange(
-      canApply,
-      onProgress,
-      rethrowErrors: true,
-    ).whenComplete(() {
-      _inFlight = null;
-    });
+    return _inFlight ??= _exchange(canApply, onProgress, rethrowErrors: true)
+        .whenComplete(() {
+          _inFlight = null;
+        });
   }
 
   static Future<bool> _exchange(

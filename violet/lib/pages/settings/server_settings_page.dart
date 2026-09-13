@@ -249,9 +249,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
 
       if (mounted) setState(() => _message = '한국어 DB 스냅샷 생성 대기 중…');
-      final snapshotDeadline = DateTime.now().add(
-        const Duration(seconds: 90),
-      );
+      final snapshotDeadline = DateTime.now().add(const Duration(seconds: 90));
       while (DateTime.now().isBefore(snapshotDeadline)) {
         await Future<void>.delayed(const Duration(seconds: 2));
         final currentVersion = await ContentDbSync.remoteVersion();
