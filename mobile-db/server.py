@@ -134,12 +134,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         handle_request(self, activity_store if self.path == '/api/activity-sync' else store)
 
 def refresh_loop():
+    request = Path('/content-data/.violet-snapshot-request')
+    next_refresh = 0.0
     while True:
-        try:
-            make_snapshot()
-        except Exception as error:
-            print(f'Korean export failed: {error}', flush=True)
-        time.sleep(3600)
+        now = time.monotonic()
+        if now >= next_refresh or request.exists():
+            request.unlink(missing_ok=True)
+            try:
+                make_snapshot()
+            except Exception as error:
+                print(f'Korean export failed: {error}', flush=True)
+            next_refresh = time.monotonic() + 3600
+        time.sleep(5)
 
 if __name__ == '__main__':
     threading.Thread(target=refresh_loop, daemon=True).start()

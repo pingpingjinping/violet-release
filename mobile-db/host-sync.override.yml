@@ -1,0 +1,48 @@
+# Managed by mobile-db/install-host-sync.sh
+services:
+  hsync:
+    command:
+      - |
+        task_state_dir=/content-data
+        task_request="$$task_state_dir/.violet-hsync-request"
+        task_state="$$task_state_dir/.violet-hsync-state"
+        task_started="$$task_state_dir/.violet-hsync-started-at"
+        task_completed="$$task_state_dir/.violet-hsync-completed-at"
+        task_error="$$task_state_dir/.violet-hsync-error"
+        task_snapshot_request="$$task_state_dir/.violet-snapshot-request"
+
+        run_sync() {
+          rm -f "$$task_request"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$$task_started"
+          printf '%s\n' running > "$$task_state"
+          rm -f "$$task_error"
+
+          echo "[fast-hsync] starting sync"
+          if fast-hsync /content-data/data.db; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$$task_completed"
+            printf '%s\n' success > "$$task_state"
+            : > "$$task_snapshot_request"
+            echo "[fast-hsync] sync completed"
+          else
+            task_status=$$?
+            printf '%s\n' "$$task_status" > "$$task_error"
+            printf '%s\n' error > "$$task_state"
+            echo "[fast-hsync] sync failed with exit code $$task_status" >&2
+          fi
+        }
+
+        while true; do
+          run_sync
+          task_waited=0
+          while [ "$$task_waited" -lt "$${HSYNC_INTERVAL_SECONDS}" ]; do
+            if [ -f "$$task_request" ]; then
+              echo "[fast-hsync] manual sync requested"
+              break
+            fi
+            sleep 5
+            task_waited=$$((task_waited + 5))
+          done
+        done
+  web:
+    environment:
+      HOST_SYNC_DIR: /content-data

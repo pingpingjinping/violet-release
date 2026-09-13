@@ -78,7 +78,14 @@ export function SettingsPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return t('settings.sync.never');
-    return new Date(dateStr).toLocaleString();
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(new Date(dateStr));
   };
 
   const getStatusText = () => {
@@ -499,7 +506,7 @@ export function SettingsPage() {
 
           <div className={styles.infoRow}>
             <span className={styles.label}>{t('settings.sync.lastSyncDb')}</span>
-            <span>{formatDate(syncStatus?.lastSyncDb || null)}</span>
+            <span>{formatDate(syncStatus?.databaseVersion || syncStatus?.lastSyncDb || null)}</span>
           </div>
 
           <div className={styles.infoRow}>
@@ -541,16 +548,18 @@ export function SettingsPage() {
             {triggerSync.isPending ? t('settings.sync.starting') : t('settings.sync.syncNow')}
           </button>
 
-          <button
-            className={styles.fullSyncBtn}
-            onClick={handleFullSync}
-            disabled={isSyncing || triggerFullSync.isPending}
-          >
-            {triggerFullSync.isPending ? t('settings.sync.starting') : t('settings.sync.redownloadDB')}
-          </button>
+          {!syncStatus?.hostManaged && (
+            <button
+              className={styles.fullSyncBtn}
+              onClick={handleFullSync}
+              disabled={isSyncing || triggerFullSync.isPending}
+            >
+              {triggerFullSync.isPending ? t('settings.sync.starting') : t('settings.sync.redownloadDB')}
+            </button>
+          )}
         </div>
 
-        {showFullSyncConfirm && (
+        {showFullSyncConfirm && !syncStatus?.hostManaged && (
           <div className={styles.confirmDialog}>
             <p>{t('settings.sync.confirmRedownload')}</p>
             <div className={styles.confirmButtons}>

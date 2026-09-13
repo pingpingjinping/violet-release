@@ -39,6 +39,8 @@ export interface SyncProgress {
   lastSyncDb: string | null;
   dbExists: boolean;
   error: string | null;
+  databaseVersion: string | null;
+  hostManaged: boolean;
   progress?: {
     current: number;
     total: number;
@@ -55,10 +57,12 @@ export class SyncManager {
   private currentProgress?: { current: number; total: number; message: string };
   private statePath: string;
   private dataDir: string;
+  private hostSyncDir: string | null;
 
   private constructor() {
     this.dataDir = path.resolve(__dirname, '../../data');
     this.statePath = path.join(this.dataDir, 'sync-state.json');
+    this.hostSyncDir = process.env.HOST_SYNC_DIR?.trim() || null;
   }
 
   static getInstance(): SyncManager {
@@ -74,6 +78,12 @@ export class SyncManager {
     // Ensure data directory exists
     if (!fs.existsSync(this.dataDir)) {
       fs.mkdirSync(this.dataDir, { recursive: true });
+    }
+
+    if (this.hostSyncDir) {
+      fs.mkdirSync(this.hostSyncDir, { recursive: true });
+      console.log(`[SyncManager] Host-managed sync enabled: ${this.hostSyncDir}`);
+      return;
     }
 
     // Check if DB exists
@@ -110,6 +120,11 @@ export class SyncManager {
   }
 
   async checkAndSync(): Promise<void> {
+    if (this.hostSyncDir) {
+      this.requestHostSync();
+      return;
+    }
+
     if (this.isSyncing) {
       console.log('[SyncManager] Sync already in progress, skipping');
       return;
@@ -177,6 +192,11 @@ export class SyncManager {
   }
 
   async triggerFullSync(): Promise<void> {
+    if (this.hostSyncDir) {
+      this.requestHostSync();
+      return;
+    }
+
     if (this.isSyncing) {
       throw new Error('Sync already in progress');
     }
@@ -184,15 +204,98 @@ export class SyncManager {
   }
 
   getStatus(): SyncProgress {
+    if (this.hostSyncDir) {
+      return this.getHostSyncStatus();
+    }
+
     const state = this.loadState();
+    const databaseVersion = this.getDatabaseVersion();
     return {
       status: this.currentStatus,
       lastSync: state.lastSyncAt || null,
       lastSyncDb: state.databaseSync,
       dbExists: fs.existsSync(getDbPath()),
       error: this.currentError,
+      databaseVersion,
+      hostManaged: false,
       progress: this.currentProgress,
     };
+  }
+
+  private requestHostSync(): void {
+    if (!this.hostSyncDir) return;
+
+    const requestPath = path.join(this.hostSyncDir, '.violet-hsync-request');
+    const status = this.getHostSyncStatus();
+    if (status.status === 'checking' || status.status === 'applying_chunks') {
+      return;
+    }
+
+    try {
+      fs.writeFileSync(requestPath, new Date().toISOString() + '\n', {
+        encoding: 'utf-8',
+        flag: 'wx',
+      });
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+    }
+
+    this.currentStatus = 'checking';
+    this.currentError = null;
+  }
+
+  private getHostSyncStatus(): SyncProgress {
+    if (!this.hostSyncDir) {
+      throw new Error('Host sync directory is not configured');
+    }
+
+    const requestPath = path.join(this.hostSyncDir, '.violet-hsync-request');
+    const state = this.readHostSyncFile('.violet-hsync-state');
+    const completedAt = this.readHostSyncFile('.violet-hsync-completed-at');
+    const databaseVersion = completedAt || this.getDatabaseVersion();
+
+    let status: SyncStatus = 'idle';
+    if (fs.existsSync(requestPath)) {
+      status = 'checking';
+    } else if (state === 'running') {
+      status = 'applying_chunks';
+    } else if (state === 'error') {
+      status = 'error';
+    }
+
+    const error =
+      status === 'error'
+        ? this.readHostSyncFile('.violet-hsync-error') || 'Pi database sync failed'
+        : null;
+
+    return {
+      status,
+      lastSync: completedAt,
+      lastSyncDb: databaseVersion,
+      dbExists: fs.existsSync(getDbPath()),
+      error,
+      databaseVersion,
+      hostManaged: true,
+    };
+  }
+
+  private readHostSyncFile(name: string): string | null {
+    if (!this.hostSyncDir) return null;
+    try {
+      const value = fs.readFileSync(path.join(this.hostSyncDir, name), 'utf-8').trim();
+      return value || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private getDatabaseVersion(): string | null {
+    try {
+      return fs.statSync(getDbPath()).mtime.toISOString();
+    } catch {
+      return null;
+    }
   }
 
   private async parseSyncVersion(): Promise<SyncInfoRecord[]> {
