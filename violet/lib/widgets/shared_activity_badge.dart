@@ -22,16 +22,13 @@ class SharedActivityBadge extends StatefulWidget {
 
 class _SharedActivityBadgeState extends State<SharedActivityBadge> {
   @override
-  void initState() {
-    super.initState();
-    unawaited(ActivitySync.load().catchError((Object _) {}));
-  }
-
-  @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
     valueListenable: SharedActivityBadge.visible,
-    builder: (context, visible, _) =>
-        visible ? _buildBadge(context) : const SizedBox.shrink(),
+    builder: (context, visible, _) {
+      if (!visible) return const SizedBox.shrink();
+      unawaited(ActivitySync.load().catchError((Object _) {}));
+      return _buildBadge(context);
+    },
   );
 
   Widget _buildBadge(BuildContext context) =>
