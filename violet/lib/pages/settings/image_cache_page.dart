@@ -119,6 +119,10 @@ class _ImageCachePageState extends State<ImageCachePage> {
 
   Future<void> _deleteThumbnailCache() async {
     await DefaultCacheManager().emptyCache();
+    final directory = await _cacheDirectory(_thumbnailCacheFolder);
+    if (await directory.exists()) {
+      await directory.delete(recursive: true);
+    }
   }
 
   Future<void> _clear({
