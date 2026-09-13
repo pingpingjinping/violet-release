@@ -9,11 +9,11 @@ class ActiveTabScope extends InheritedNotifier<ValueNotifier<int>> {
   final int tabIndex;
 
   const ActiveTabScope({
-    super.key,
+    Key? key,
     required this.tabIndex,
     required ValueNotifier<int> activeTab,
     required Widget child,
-  }) : super(notifier: activeTab, child: child);
+  }) : super(key: key, notifier: activeTab, child: child);
 
   static bool isActive(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<ActiveTabScope>();
