@@ -24,6 +24,14 @@ class ThumbnailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!ActiveTabScope.isActive(context)) {
+      return SizedBox(
+        width: c.articleListItem.showDetail
+            ? (c.articleListItem.showUltra ? 120 : 100)
+            : null,
+      );
+    }
+
     final result = Obx(() {
       final greyScale =
           c.isLatestRead.value &&
