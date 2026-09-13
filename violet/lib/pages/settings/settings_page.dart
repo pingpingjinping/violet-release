@@ -126,9 +126,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
             title: const Text('이미지 캐시'),
             subtitle: const Text('본문·썸네일 용량 확인 및 삭제'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ImageCachePage()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ImageCachePage())),
           ),
           ListTile(
             leading: const Icon(Icons.sync),

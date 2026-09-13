@@ -278,8 +278,7 @@ class _ImageCachePageState extends State<ImageCachePage> {
             _cacheCard(
               icon: Icons.photo_library_outlined,
               title: '본문 이미지 캐시',
-              description:
-                  '작품을 열었을 때 인터넷에서 받은 임시 본문 이미지입니다.',
+              description: '작품을 열었을 때 인터넷에서 받은 임시 본문 이미지입니다.',
               usage: _bodyUsage,
               clear: _clearBodyCache,
             ),
