@@ -40,7 +40,7 @@ class _ScriptWebViewState extends State<ScriptWebView>
   void initState() {
     super.initState();
 
-    timer = Timer.periodic(const Duration(minutes: 1), timerCallback);
+    timer = Timer.periodic(const Duration(minutes: 30), timerCallback);
 
     // run script readiness probe
     Future.delayed(
@@ -48,6 +48,15 @@ class _ScriptWebViewState extends State<ScriptWebView>
     ).then((value) => v4FailCheckProbe());
 
     ScriptWebViewProxy.reload = () => webViewController?.reload();
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    if (ScriptWebViewProxy.reload != null) {
+      ScriptWebViewProxy.reload = null;
+    }
+    super.dispose();
   }
 
   Future<void> timerCallback(timer) async {
