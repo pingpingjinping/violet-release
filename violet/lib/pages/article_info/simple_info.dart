@@ -182,9 +182,8 @@ class SimpleInfoWidget extends StatelessWidget {
                 false;
             if (!downloaded) return const SizedBox.shrink();
             return const Icon(
-              Icons.arrow_downward_rounded,
+              Icons.file_download,
               size: 36,
-              weight: 800,
               color: Color(0xFF2196F3),
               shadows: [
                 Shadow(color: Colors.black54, blurRadius: 2),
