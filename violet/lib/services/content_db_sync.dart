@@ -1,6 +1,8 @@
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/server_config.dart';
 
@@ -27,10 +29,68 @@ class ContentDbSync {
     if (_checkedThisSession) return false;
     _checkedThisSession = true;
     final prefs = await SharedPreferences.getInstance();
+
+    // Keep Pi's ExHentai cookie in sync with the cookie captured by the app.
+    // Do not block the content DB check/download if the Pi is unreachable.
+    unawaited(_syncEhCookieToPi(prefs));
+
     if (!(prefs.getBool('auto_content_db_update') ?? true)) return false;
     return _inFlight ??= _exchange(canApply, onProgress).whenComplete(() {
       _inFlight = null;
     });
+  }
+
+  static Future<void> _syncEhCookieToPi(SharedPreferences prefs) async {
+    final cookie = prefs.getString('eh_cookies')?.trim();
+    if (cookie == null || cookie.isEmpty) return;
+
+    final client = http.Client();
+    try {
+      final base = ServerConfig.apiBase(ServerConfig.webBase);
+      final baseUri = Uri.parse(base);
+      if (!_isLocalOrPrivateHost(baseUri.host)) return;
+
+      final uri = Uri.parse(
+        ServerConfig.endpoint(base, 'api/settings/exhentai-cookie'),
+      );
+
+      final response = await client
+          .put(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'cookie': cookie}),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        Logger.error(
+          '[ContentDbSync] ExHentai cookie sync failed: '
+          'HTTP ${response.statusCode}',
+        );
+      }
+    } catch (_) {
+      // Cookie sync is best-effort. A Pi/network failure must not delay or
+      // prevent the normal startup DB synchronization.
+      Logger.error('[ContentDbSync] ExHentai cookie sync failed');
+    } finally {
+      client.close();
+    }
+  }
+
+  static bool _isLocalOrPrivateHost(String host) {
+    if (host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host.endsWith('.local') ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.')) {
+      return true;
+    }
+
+    final parts = host.split('.');
+    if (parts.length != 4 || parts[0] != '172') return false;
+    final second = int.tryParse(parts[1]);
+    return second != null && second >= 16 && second <= 31;
   }
 
   /// Checks the snapshot advertised by the configured content server.
