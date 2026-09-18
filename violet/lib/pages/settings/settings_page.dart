@@ -99,46 +99,12 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
       _shouldReload = false;
       _cachedGroups = _themeGroup()
         ..addAll([const UserStatusCard()])
+        ..addAll(_serverDataGroup())
         ..addAll(_communityGroup())
         ..addAll(_searchGroup())
         ..addAll(_systemGroup())
         ..addAll(_securityGroup())
         ..addAll(_databaseGroup())
-        ..addAll([
-          ListTile(
-            leading: const Icon(Icons.dns_outlined),
-            title: const Text('작품 서버 주소'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.backup_outlined),
-            title: const Text('Pi 전체 백업·복원'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.image_outlined),
-            title: const Text('이미지 캐시'),
-            subtitle: const Text('본문·썸네일 용량 확인 및 삭제'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const ImageCachePage())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.sync),
-            title: const Text('앱·웹 기록 동기화'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const BookmarkSyncPage())),
-          ),
-        ])
         ..addAll(_networkingGroup())
         ..addAll(_downloadGroup())
         ..addAll(_bookmarkGroup())
@@ -557,6 +523,47 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
               _shouldReload = true;
             });
           },
+        ),
+      ]),
+    ];
+  }
+
+  List<Widget> _serverDataGroup() {
+    return [
+      const SettingGroupName(name: '서버 및 데이터'),
+      _buildItems([
+        ListTile(
+          leading: const Icon(Icons.dns_outlined),
+          title: const Text('작품 서버 주소'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.backup_outlined),
+          title: const Text('Pi 전체 백업·복원'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const PiBackupPage())),
+        ),
+        ListTile(
+          leading: const Icon(Icons.image_outlined),
+          title: const Text('이미지 캐시'),
+          subtitle: const Text('본문·썸네일 용량 확인 및 삭제'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ImageCachePage())),
+        ),
+        ListTile(
+          leading: const Icon(Icons.sync),
+          title: const Text('앱·웹 기록 동기화'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const BookmarkSyncPage())),
         ),
       ]),
     ];
