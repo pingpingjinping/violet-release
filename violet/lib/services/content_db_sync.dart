@@ -44,11 +44,18 @@ class ContentDbSync {
     final cookie = prefs.getString('eh_cookies')?.trim();
     if (cookie == null || cookie.isEmpty) return;
 
+    final syncToken = prefs.getString('bookmark_sync_token')?.trim() ?? '';
+    final syncBase = prefs.getString('bookmark_sync_server')?.trim() ?? '';
+    if (syncToken.isEmpty || syncBase.isEmpty) return;
+
     final client = http.Client();
     try {
       final base = ServerConfig.apiBase(ServerConfig.webBase);
       final baseUri = Uri.parse(base);
       if (!_isLocalOrPrivateHost(baseUri.host)) return;
+
+      final syncUri = Uri.parse(ServerConfig.normalize(syncBase));
+      if (syncUri.host != baseUri.host) return;
 
       final uri = Uri.parse(
         ServerConfig.endpoint(base, 'api/settings/exhentai-cookie'),
@@ -57,7 +64,10 @@ class ContentDbSync {
       final response = await client
           .put(
             uri,
-            headers: const {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Violet-Sync-Token': syncToken,
+            },
             body: jsonEncode({'cookie': cookie}),
           )
           .timeout(const Duration(seconds: 5));
