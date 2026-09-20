@@ -95,27 +95,8 @@ class HentaiDonwloadManager {
             laugage: target.language(),
             uploadDate: target.getDateTime().toString(),
             filenameWithoutExtension: intToString(i, pad: 3),
-            artist: target.artists() != null
-                ? target
-                      .artists()
-                      .split('|')
-                      .firstWhere(
-                        (artist) =>
-                            artist != null && (artist as String).isNotEmpty,
-                      )
-                : target
-                      .groups()
-                      ?.split('|')
-                      .firstWhere(
-                        (group) =>
-                            group != null && (group as String).isNotEmpty,
-                      ),
-            group: target
-                .groups()
-                ?.split('|')
-                .firstWhere(
-                  (group) => group != null && (group as String).isNotEmpty,
-                ),
+            artist: _firstPipeValue(target.artists()),
+            group: _firstPipeValue(target.groups()),
             extension: _extensionFromImageUrl(page),
             extractor: 'hentai',
             downloadDate: DateTime.now().toString(),
@@ -129,6 +110,21 @@ class HentaiDonwloadManager {
     }
 
     return result;
+  }
+
+  static String? _firstPipeValue(dynamic raw) {
+    if (raw is! String) return null;
+
+    for (final value in raw.split('|')) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) continue;
+
+      final normalized = trimmed.toLowerCase();
+      if (normalized == 'n/a' || normalized == 'unknown') continue;
+      return trimmed;
+    }
+
+    return null;
   }
 
   // https://stackoverflow.com/questions/15193983/is-there-a-built-in-method-to-pad-a-string

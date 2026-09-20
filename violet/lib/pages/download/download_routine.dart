@@ -204,7 +204,9 @@ class DownloadRoutine {
   Future<void> setDownloadComplete() async {
     final originals = tasks!.map((task) => task.downloadPath!).toList();
     final workingPath = result['Path'] as String;
-    final archivePath = join(dirname(workingPath), '${item.url()}.zip');
+    final archiveDirectory = await _downloadArchiveDirectory();
+    await Directory(archiveDirectory).create(recursive: true);
+    final archivePath = join(archiveDirectory, '${item.url()}.zip');
     final entries = await DownloadArchive.create(archivePath, originals);
     if (shouldCancel?.call() ?? false) {
       await DownloadArchive.deleteSources(entries);
@@ -237,6 +239,64 @@ class DownloadRoutine {
     } catch (error) {
       debugPrint('Could not remove temporary download pages: $error');
     }
+  }
+
+  Future<String> _downloadArchiveDirectory() async {
+    final format = tasks!.first.format;
+    final artist = _sanitizeSortFolderName(format?.artist);
+    final group = _sanitizeSortFolderName(format?.group);
+    final extractor = _sanitizeSortFolderName(format?.extractor) ?? 'hentai';
+    final basepath = await downloadBasePath();
+
+    if (artist != null) {
+      return join(basepath, extractor, 'artist', artist);
+    }
+    if (group != null) {
+      return join(basepath, extractor, 'group', group);
+    }
+    return join(basepath, extractor, '기타');
+  }
+
+  String? _sanitizeSortFolderName(String? value) {
+    if (value == null) return null;
+
+    var sanitized = value
+        .trim()
+        .replaceAll('|', 'ㅣ')
+        .replaceAll(RegExp(r'[/\\?%*:|"<>]'), '')
+        .replaceFirst(RegExp(r'[. ]+$'), '');
+
+    if (sanitized.isEmpty) return null;
+
+    const reservedWindowsNames = {
+      'CON',
+      'PRN',
+      'AUX',
+      'NUL',
+      'COM1',
+      'COM2',
+      'COM3',
+      'COM4',
+      'COM5',
+      'COM6',
+      'COM7',
+      'COM8',
+      'COM9',
+      'LPT1',
+      'LPT2',
+      'LPT3',
+      'LPT4',
+      'LPT5',
+      'LPT6',
+      'LPT7',
+      'LPT8',
+      'LPT9',
+    };
+    if (reservedWindowsNames.contains(sanitized.toUpperCase())) {
+      sanitized = '_$sanitized';
+    }
+
+    return sanitized;
   }
 
   Future<void> _setState(int state) async {
