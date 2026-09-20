@@ -154,8 +154,9 @@ class ContentDbSync {
         return false;
       }
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getInt('db_exists') != 1 ||
-          prefs.getString('databasetype') == 'dummy') {
+      final databaseType =
+          prefs.getString('databasetype') ?? Settings.databaseType.value;
+      if (prefs.getInt('db_exists') != 1 || databaseType == 'dummy') {
         return false;
       }
       onProgress?.call('DB 최신 버전 확인 중', 0, 0);
@@ -172,7 +173,7 @@ class ContentDbSync {
         version = int.tryParse(fields[1]);
         download = Uri.tryParse(
           ServerConfig.downloadUrl(
-            '${fields[2]}-korean.db',
+            '${fields[2]}${SyncManager.createRawdbPostfixiOS(databaseType)}',
             ServerConfig.webBase,
           ),
         );

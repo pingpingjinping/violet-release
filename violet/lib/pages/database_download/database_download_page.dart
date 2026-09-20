@@ -137,7 +137,7 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
       if (await File('${dir.path}/db.sql.7z').exists()) {
         await File('${dir.path}/db.sql.7z').delete();
       }
-      if (widget.dbType! == 'global') {
+      if (widget.dbType! != 'dummy') {
         switch (target) {
           case 'latest':
             await SyncManager.checkSyncLatest(propagateException);
@@ -165,9 +165,9 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
           tnu = 0;
         }),
       );
-      if (widget.dbType! == 'global') {
+      if (widget.dbType! != 'dummy') {
         await dio.download(
-          SyncManager.getLatestDB().getDBDownloadUrliOS('ko'),
+          SyncManager.getLatestDB().getDBDownloadUrliOS(widget.dbType!),
           '${dir.path}/db.sql.7z',
           onReceiveProgress: (rec, total) {
             nu += rec - latest;
@@ -204,7 +204,7 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
         await createDummy();
         await Settings.useChunkSync.setValue(false);
       }
-      if (widget.dbType! == 'global') {
+      if (widget.dbType! != 'dummy') {
         final downloadedPath = '${dir.path}/db.sql.7z';
 
         final downloadedDb = await openDatabase(
@@ -238,13 +238,13 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
         await Directory(dirname(destinationPath)).create(recursive: true);
         await File(downloadedPath).rename(destinationPath);
 
-        // This server provides complete Korean snapshots, not incremental chunks.
+        // This server provides complete snapshots, not incremental chunks.
         await Settings.useChunkSync.setValue(false);
       }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('db_exists', 1);
-      await prefs.setString('databasetype', widget.dbType!);
+      await Settings.databaseType.setValue(widget.dbType!);
       if (widget.dbType! != 'dummy') {
         await prefs.setString('content-snapshot-server', ServerConfig.webBase);
         await prefs.setInt(
@@ -259,7 +259,7 @@ class DataBaseDownloadPageState extends State<DataBaseDownloadPage> {
         await prefs.remove('content-snapshot-version');
         await prefs.remove(ContentDbSync.lastSuccessfulSyncKey);
       }
-      if (widget.dbType! == 'global') {
+      if (widget.dbType! != 'dummy') {
         await prefs.setString(
           'databasesync',
           SyncManager.getLatestDB().getDateTime().toString(),
