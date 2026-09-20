@@ -177,15 +177,23 @@ class _SimpleInfoWidgetState extends State<SimpleInfoWidget> {
       height: 40,
       child: ValueListenableBuilder<int>(
         valueListenable: DownloadService.instance.changes,
-        builder: (context, _, __) => FutureBuilder<Download>(
-          future: Download.getInstance(),
+        builder: (context, _, __) => FutureBuilder<(bool, bool)>(
+          future: _downloadState(data.queryResult.id()),
           builder: (context, snapshot) {
-            final downloaded =
-                snapshot.data?.isDownloadedArticle(
-                  data.queryResult.id(),
-                  false,
-                ) ??
-                false;
+            final state = snapshot.data;
+            if (state == null) return const SizedBox.shrink();
+
+            final (downloaded, active) = state;
+            if (active) {
+              return const Icon(
+                Icons.downloading,
+                size: 36,
+                color: Color(0xFFFF9800),
+                shadows: [
+                  Shadow(color: Colors.black54, blurRadius: 2),
+                ],
+              );
+            }
             if (!downloaded) return const SizedBox.shrink();
             return const Icon(
               Icons.file_download,
@@ -199,6 +207,15 @@ class _SimpleInfoWidgetState extends State<SimpleInfoWidget> {
         ),
       ),
     );
+  }
+
+  Future<(bool, bool)> _downloadState(int id) async {
+    final download = await Download.getInstance();
+    final downloaded = download.isDownloadedArticle(id, false);
+    final active = await DownloadService.instance.isActiveDownload(
+      id.toString(),
+    );
+    return (downloaded, active);
   }
 
   Widget simpleInfo(ArticleInfo data) {
