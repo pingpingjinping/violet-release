@@ -4,7 +4,6 @@ import 'package:violet/services/download_archive.dart';
 
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:synchronized/synchronized.dart';
 import 'package:violet/database/query.dart';

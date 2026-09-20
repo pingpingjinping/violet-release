@@ -6,7 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/painting.dart';
-import 'download_archive.dart';
+import 'package:violet/services/download_archive.dart';
 
 /// Uses Flutter's image cache and decoding for both loose files and ZIP entries.
 class DownloadImageProvider extends ExtendedFileImageProvider {
