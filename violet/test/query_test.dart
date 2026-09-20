@@ -45,16 +45,33 @@ void main() {
       expect(result2[0].$1.toString(), 'female:big breasts');
     });
 
-    test('Expunged metadata marker', () {
-      final expunged = QueryResult(
-        result: {'Id': 1, 'Tags': '|female:loli|expunged|'},
+    test('Expunged-only metadata marker', () {
+      final expungedOnly = QueryResult(
+        result: {
+          'Id': 1,
+          'Tags': '|female:loli|expunged|',
+          'ExistOnHitomi': 0,
+        },
       );
-      final normal = QueryResult(
-        result: {'Id': 2, 'Tags': '|female:loli|'},
+      final hitomiExpunged = QueryResult(
+        result: {
+          'Id': 2,
+          'Tags': '|female:loli|expunged|',
+          'ExistOnHitomi': 1,
+        },
+      );
+      final normalExh = QueryResult(
+        result: {
+          'Id': 3,
+          'Tags': '|female:loli|',
+          'ExistOnHitomi': 0,
+        },
       );
 
-      expect(expunged.isExpunged(), true);
-      expect(normal.isExpunged(), false);
+      expect(expungedOnly.isExpunged(), true);
+      expect(expungedOnly.isExpungedOnly(), true);
+      expect(hitomiExpunged.isExpungedOnly(), false);
+      expect(normalExh.isExpungedOnly(), false);
     });
 
     test('Hitomi Query To Sql', () {
