@@ -4,7 +4,6 @@ import 'package:violet/services/download_image_provider.dart';
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:extended_image/extended_image.dart';
@@ -260,7 +259,8 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
 
         if (widget.item.state() == 0 && widget.item.files() != null) {
           final files = widget.item.filesWithoutThumbnail();
-          if (files.isEmpty || files.any((file) => !File(file).existsSync())) {
+          if (files.isEmpty ||
+              files.any((file) => !DownloadArchive.exists(file))) {
             showToast(
               level: ToastLevel.error,
               message: 'Downloaded files not found. Please recover it.',

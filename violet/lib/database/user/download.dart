@@ -178,6 +178,7 @@ class Download {
   }
 
   void appendDownloaded(int id, DownloadItemModel item) {
+    _isDownloadedFileExistsCache.remove(id);
     _downloadedChecker.add(id);
     _downloadedItems[id] = item;
   }

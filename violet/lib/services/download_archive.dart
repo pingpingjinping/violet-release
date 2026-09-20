@@ -90,7 +90,15 @@ class DownloadArchive {
         final name =
             '$prefix${i.toString().padLeft(6, '0')}${p.extension(files[i])}';
         names.add(name);
-        await encoder.addFile(source, name, 0);
+        final pageInput = InputFileStream(source.path);
+        try {
+          encoder.addArchiveFile(
+            ArchiveFile.stream(name, pageInput)
+              ..compression = CompressionType.none,
+          );
+        } finally {
+          await pageInput.close();
+        }
       }
       await encoder.close();
       opened = false;
@@ -117,9 +125,12 @@ class DownloadArchive {
       await File(temporary).rename(destination);
       return names.map((name) => entry(destination, name)).toList();
     } finally {
-      if (opened) await encoder.close();
-      final part = File(temporary);
-      if (part.existsSync()) part.deleteSync();
+      try {
+        if (opened) await encoder.close();
+      } finally {
+        final part = File(temporary);
+        if (part.existsSync()) part.deleteSync();
+      }
     }
   });
 
