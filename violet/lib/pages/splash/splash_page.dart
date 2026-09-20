@@ -51,7 +51,7 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 
-enum Database { all, dummy }
+enum Database { korean, english, japanese, all }
 
 bool globalInitialized = false;
 
@@ -237,7 +237,21 @@ class _SplashPageState extends State<SplashPage> {
       });
       await Future.delayed(const Duration(milliseconds: 500));
       setState(() {
-        _database = Database.all;
+        switch (Settings.databaseType.value) {
+          case 'en':
+            _database = Database.english;
+            break;
+          case 'ja':
+            _database = Database.japanese;
+            break;
+          case 'global':
+            _database = Database.all;
+            break;
+          case 'ko':
+          default:
+            _database = Database.korean;
+            break;
+        }
       });
     }
   }
@@ -482,7 +496,7 @@ class _SplashPageState extends State<SplashPage> {
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.ease,
                 width: animateBox ? 300 : 300,
-                height: animateBox ? 300 : 0,
+                height: animateBox ? 430 : 0,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: AnimationConfiguration.toStaggeredList(
@@ -497,6 +511,54 @@ class _SplashPageState extends State<SplashPage> {
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
                       ),
                       RadioTile(
+                        value: Database.korean,
+                        groupValue: _database,
+                        setGroupValue: _setDatabase,
+                        title: const Text(
+                          '한국어 DB',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          '한국어 작품만 포함',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onLongPress: () {
+                          showOkDialog(context, '한국어 작품 데이터베이스를 사용합니다.');
+                        },
+                      ),
+                      RadioTile(
+                        value: Database.english,
+                        groupValue: _database,
+                        setGroupValue: _setDatabase,
+                        title: const Text(
+                          'English DB',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          '영어 작품만 포함',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onLongPress: () {
+                          showOkDialog(context, '영어 작품 데이터베이스를 사용합니다.');
+                        },
+                      ),
+                      RadioTile(
+                        value: Database.japanese,
+                        groupValue: _database,
+                        setGroupValue: _setDatabase,
+                        title: const Text(
+                          '日本語 DB',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          '일본어 작품만 포함',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onLongPress: () {
+                          showOkDialog(context, '일본어 작품 데이터베이스를 사용합니다.');
+                        },
+                      ),
+                      RadioTile(
                         value: Database.all,
                         groupValue: _database,
                         setGroupValue: _setDatabase,
@@ -504,30 +566,9 @@ class _SplashPageState extends State<SplashPage> {
                           translations.trans('dballname'),
                           style: const TextStyle(fontSize: 14),
                         ),
-                        subtitle: Text(
-                          '${imgZipSize['global']}${translations.trans('dbdownloadsize')}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        onLongPress: () {
-                          showOkDialog(
-                            context,
-                            translations
-                                .trans('dballmsg')
-                                .replaceFirst('%s', imgSize['global']!),
-                          );
-                        },
-                      ),
-                      RadioTile(
-                        value: Database.dummy,
-                        groupValue: _database,
-                        setGroupValue: _setDatabase,
-                        title: Text(
-                          'Dummy Database',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        subtitle: Text(
-                          '${imgZipSize['dummy']}${translations.trans('dbdownloadsize')}',
-                          style: const TextStyle(fontSize: 12),
+                        subtitle: const Text(
+                          '모든 언어 포함',
+                          style: TextStyle(fontSize: 12),
                         ),
                         onLongPress: () {
                           showOkDialog(
@@ -631,7 +672,13 @@ class _SplashPageState extends State<SplashPage> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => DataBaseDownloadPage(
-          dbType: _database == Database.all ? 'global' : 'dummy',
+          dbType: switch (_database) {
+            Database.korean => 'ko',
+            Database.english => 'en',
+            Database.japanese => 'ja',
+            Database.all => 'global',
+            null => 'ko',
+          },
         ),
       ),
     );
