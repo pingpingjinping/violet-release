@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/server_config.dart';
+import 'package:violet/settings/settings.dart';
 
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
