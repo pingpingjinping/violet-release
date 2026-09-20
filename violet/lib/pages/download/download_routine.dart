@@ -264,26 +264,7 @@ class DownloadRoutine {
         .trim()
         .replaceAll('|', 'ㅣ')
         .replaceAll(RegExp(r'[/\\?%*:|"<>]'), '')
-        .replaceFirst(RegExp(r'[. ]+
-    result['State'] = state;
-    await _updateItem();
-  }
-
-  Future<void> _updateItem() async {
-    item.result = result;
-    await item.update();
-    setStateCallback.call();
-  }
-
-  Future<String> downloadBasePath() async {
-    if (Settings.useInnerStorage.value) {
-      return (await getApplicationDocumentsDirectory()).path;
-    } else {
-      return Settings.downloadBasePath.value;
-    }
-  }
-}
-), '');
+        .replaceFirst(RegExp(r'[. ]+$'), '');
 
     if (sanitized.isEmpty) return null;
 
