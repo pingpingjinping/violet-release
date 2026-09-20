@@ -16,40 +16,46 @@ import 'package:violet/settings/settings.dart';
 import 'package:violet/widgets/article_item/image_provider_manager.dart';
 import 'package:violet/widgets/article_item/thumbnail_view_page.dart';
 
-class SimpleInfoWidget extends StatelessWidget {
+class SimpleInfoWidget extends StatefulWidget {
+  const SimpleInfoWidget({super.key});
+
+  @override
+  State<SimpleInfoWidget> createState() => _SimpleInfoWidgetState();
+}
+
+class _SimpleInfoWidgetState extends State<SimpleInfoWidget> {
   final FlareControls _flareController = FlareControls();
   static final DateFormat _dateFormat = DateFormat(' yyyy/MM/dd HH:mm');
-
-  SimpleInfoWidget({super.key});
+  bool _titleExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     final size = thumbnailSize();
     final data = Provider.of<ArticleInfo>(context);
-    return Stack(
-      children: <Widget>[
-        Row(
-          children: [
-            Stack(
-              children: <Widget>[
-                thumbnail(context, data),
-                bookmark(data),
-                downloadMarker(data),
-              ],
-            ),
-            Expanded(
-              child: SizedBox(
-                height: size.height,
-                width: size.width,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: simpleInfo(data),
-                ),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 180),
+      alignment: Alignment.topCenter,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: <Widget>[
+              thumbnail(context, data),
+              bookmark(data),
+              downloadMarker(data),
+            ],
+          ),
+          Expanded(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: size.height),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: simpleInfo(data),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -224,11 +230,17 @@ class SimpleInfoWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisAlignment: MainAxisAlignment.start,
       children: <Widget>[
-        Text(
-          data.title,
-          maxLines: 5,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _titleExpanded = !_titleExpanded),
+          child: Text(
+            data.title,
+            maxLines: _titleExpanded ? null : 5,
+            overflow: _titleExpanded
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
         ),
         Text(data.artist),
       ],

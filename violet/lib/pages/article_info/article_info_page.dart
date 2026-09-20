@@ -86,11 +86,11 @@ class ArticleInfoPage extends StatelessWidget {
               children: [
                 Container(
                   width: width,
-                  height: simpleInfoHeight(),
+                  constraints: BoxConstraints(minHeight: simpleInfoHeight()),
                   color: Settings.themeWhat.value
                       ? Colors.grey.shade900.withOpacity(0.6)
                       : Colors.white.withOpacity(0.2),
-                  child: SimpleInfoWidget(),
+                  child: const SimpleInfoWidget(),
                 ),
                 buttonArea(context),
                 TagInfoAreaWidget(queryResult: data.queryResult),
