@@ -23,6 +23,10 @@ class QueryResult {
   published() => result['Published'];
   files() => result['Files'];
   classname() => result['Class'];
+  bool isExpunged() => (tags() as String?)
+      ?.split('|')
+      .any((tag) => tag.trim().toLowerCase() == 'expunged') ??
+      false;
 
   // For E/Ex Hentai
   publishedeh() => result['PublishedEH'];
@@ -116,7 +120,10 @@ class QueryManager {
     var queryRaw = 'SELECT * FROM HitomiColumnModel WHERE ';
     queryRaw += 'Id IN (${ids.join(',')})';
     var qm = await QueryManager.query(
-      queryRaw + (!Settings.searchPure.value ? ' AND ExistOnHitomi=1' : ''),
+      queryRaw +
+          (!Settings.searchPure.value
+              ? " AND (ExistOnHitomi=1 OR Tags LIKE '%|expunged|%')"
+              : ''),
     );
 
     var qr = <String, QueryResult>{};

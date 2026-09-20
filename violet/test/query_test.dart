@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:violet/component/hitomi/tag_translate.dart';
 import 'package:violet/component/index.dart';
 import 'package:violet/component/query_translate.dart';
+import 'package:violet/database/query.dart';
 import 'package:violet/settings/settings.dart';
 
 void main() {
@@ -44,6 +45,18 @@ void main() {
       expect(result2[0].$1.toString(), 'female:big breasts');
     });
 
+    test('Expunged metadata marker', () {
+      final expunged = QueryResult(
+        result: {'Id': 1, 'Tags': '|female:loli|expunged|'},
+      );
+      final normal = QueryResult(
+        result: {'Id': 2, 'Tags': '|female:loli|'},
+      );
+
+      expect(expunged.isExpunged(), true);
+      expect(normal.isExpunged(), false);
+    });
+
     test('Hitomi Query To Sql', () {
       Settings.searchPure.setValue(false);
       final result0 = translate2query(
@@ -58,15 +71,15 @@ void main() {
 
       expect(
         result0,
-        'SELECT * FROM HitomiColumnModel WHERE Tags LIKE \'%|female:sole female|%\' AND (Language LIKE \'%korean%\' OR Language LIKE \'%n/a%\')  AND ExistOnHitomi=1',
+        'SELECT * FROM HitomiColumnModel WHERE Tags LIKE \'%|female:sole female|%\' AND (Language LIKE \'%korean%\' OR Language LIKE \'%n/a%\')  AND (ExistOnHitomi=1 OR Tags LIKE \'%|expunged|%\')',
       );
       expect(
         result1,
-        'SELECT * FROM HitomiColumnModel WHERE Tags LIKE \'%|female:sole female|%\' AND NOT (Tags LIKE \'%|female:mother|%\' AND Tags LIKE \'%|female:milf|%\')  AND ExistOnHitomi=1',
+        'SELECT * FROM HitomiColumnModel WHERE Tags LIKE \'%|female:sole female|%\' AND NOT (Tags LIKE \'%|female:mother|%\' AND Tags LIKE \'%|female:milf|%\')  AND (ExistOnHitomi=1 OR Tags LIKE \'%|expunged|%\')',
       );
       expect(
         result2,
-        'SELECT * FROM HitomiColumnModel WHERE (Language LIKE \'%korean%\' OR Language LIKE \'%n/a%\') AND (Tags LIKE \'%|female:sole female|%\') IS NOT 1  AND ExistOnHitomi=1',
+        'SELECT * FROM HitomiColumnModel WHERE (Language LIKE \'%korean%\' OR Language LIKE \'%n/a%\') AND (Tags LIKE \'%|female:sole female|%\') IS NOT 1  AND (ExistOnHitomi=1 OR Tags LIKE \'%|expunged|%\')',
       );
     });
   });
