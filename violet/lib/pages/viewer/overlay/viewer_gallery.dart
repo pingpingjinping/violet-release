@@ -1,7 +1,6 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
-
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -154,13 +153,16 @@ class _ViewerGalleryState extends State<ViewerGallery> {
           key: itemKeys[index],
           child: Stack(
             children: <Widget>[
-              Image.file(
-                File(_pageInfo.uris[index]),
+              Image(
+                image: ResizeImage.resizeIfNeeded(
+                  width.toInt() ~/ properties[viewStyle][1],
+                  null,
+                  DownloadImageProvider(_pageInfo.uris[index]),
+                ),
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
                 isAntiAlias: true,
-                cacheWidth: width.toInt() ~/ properties[viewStyle][1],
                 filterQuality: FilterQuality.high,
               ),
               Align(

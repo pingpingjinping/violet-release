@@ -1,8 +1,9 @@
+import 'package:violet/services/download_archive.dart';
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:extended_image/extended_image.dart';
@@ -258,7 +259,8 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
 
         if (widget.item.state() == 0 && widget.item.files() != null) {
           final files = widget.item.filesWithoutThumbnail();
-          if (files.isEmpty || files.any((file) => !File(file).existsSync())) {
+          if (files.isEmpty ||
+              files.any((file) => !DownloadArchive.exists(file))) {
             showToast(
               level: ToastLevel.error,
               message: 'Downloaded files not found. Please recover it.',
@@ -406,7 +408,7 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
       _cachedThumbnail =
           widget.item.state() == 0 &&
               widget.item.rawFiles().isNotEmpty &&
-              File(widget.item.rawFiles().first).existsSync()
+              DownloadArchive.exists(widget.item.rawFiles().first)
           ? _FileThumbnailWidget(
               showDetail: style.showDetail,
               thumbnailPath: widget.item.rawFiles().first,
@@ -784,10 +786,12 @@ class _FileThumbnailWidget extends StatelessWidget {
   Widget _thumbnailImage() {
     return Hero(
       tag: thumbnailTag,
-      child: ExtendedImage.file(
-        File(thumbnailPath),
+      child: ExtendedImage(
+        image: ExtendedResizeImage.resizeIfNeeded(
+          provider: DownloadImageProvider(thumbnailPath),
+          cacheWidth: usingRawImage ? height.toInt() * 2 : null,
+        ),
         fit: BoxFit.cover,
-        cacheWidth: usingRawImage ? height.toInt() * 2 : null,
         loadStateChanged: (state) {
           if (state.extendedImageLoadState == LoadState.loading ||
               state.extendedImageLoadState == LoadState.failed) {

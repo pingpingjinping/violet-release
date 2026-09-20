@@ -1,3 +1,4 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -9,8 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:image_size_getter/file_input.dart';
-import 'package:image_size_getter/image_size_getter.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:violet/component/hentai.dart';
@@ -717,19 +716,21 @@ class _ViewerOverlayState extends State<ViewerOverlay> {
     );
   }
 
+  int _fileInfoGeneration = 0;
+
   _preprocessImageInfoForFileImage() {
     c.thumb.value = Settings.enableThumbSlider.value;
+    final sources = List<String>.from(c.provider.uris);
+    final generation = ++_fileInfoGeneration;
+    _applyFileImageSizes(List.filled(sources.length, null));
+    // ZIP I/O and header parsing must not block gestures or decode every image.
+    downloadImageSizes(sources).then((sizes) {
+      if (!mounted || generation != _fileInfoGeneration) return;
+      setState(() => _applyFileImageSizes(sizes));
+    });
+  }
 
-    var imageSizes = c.provider.uris.map((e) {
-      final image = File(e);
-      if (!image.existsSync()) return null;
-      try {
-        return ImageSizeGetter.getSize(FileInput(image));
-      } catch (_) {
-        return null;
-      }
-    }).toList();
-
+  void _applyFileImageSizes(List<(int, int)?> imageSizes) {
     _thumbImageStartPos = List.filled(imageSizes.length + 1, 0);
     _thumbImageWidth = List.filled(imageSizes.length, 0);
 
@@ -739,8 +740,7 @@ class _ViewerOverlayState extends State<ViewerOverlay> {
       final sz = imageSizes[i];
 
       if (sz != null) {
-        _thumbImageStartPos[i + 1] =
-            (c.thumbSizeValue - 14.0) * sz.width / sz.height;
+        _thumbImageStartPos[i + 1] = (c.thumbSizeValue - 14.0) * sz.$1 / sz.$2;
       } else {
         _thumbImageStartPos[i + 1] = (c.thumbSizeValue - 14.0) / 36 * 25;
       }
@@ -748,7 +748,7 @@ class _ViewerOverlayState extends State<ViewerOverlay> {
       _thumbImageWidth[i] = _thumbImageStartPos[i + 1];
       _thumbImageStartPos[i + 1] += _thumbImageStartPos[i];
 
-      if (sz != null) c.realImgHeight[i] = sz.height.toDouble();
+      if (sz != null) c.realImgHeight[i] = sz.$2.toDouble();
     }
   }
 
@@ -796,13 +796,16 @@ class _ViewerOverlayState extends State<ViewerOverlay> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4.0),
                     child: Obx(
-                      () => Image.file(
-                        File(c.provider.uris[index]),
+                      () => Image(
+                        image: ResizeImage.resizeIfNeeded(
+                          null,
+                          (c.thumbSizeValue * 2.0).toInt(),
+                          DownloadImageProvider(c.provider.uris[index]),
+                        ),
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
                         isAntiAlias: true,
-                        cacheHeight: (c.thumbSizeValue * 2.0).toInt(),
                         filterQuality: FilterQuality.high,
                       ),
                     ),

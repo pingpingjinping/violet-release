@@ -1,3 +1,4 @@
+import 'package:violet/services/download_archive.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -178,19 +179,15 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
         continue;
       }
 
-      final oldPath =
-          ((jsonDecode(item.files()!) as List<dynamic>)[0] as String)
-              .split('/')
-              .take(8)
-              .join('/');
-
-      Map<String, dynamic> result = Map<String, dynamic>.from(item.result);
-
-      if (item.files() != null) {
-        result['Files'] = item.files()!.replaceAll(oldPath, newPath);
-      }
+      final result = Map<String, dynamic>.from(item.result);
+      result['Files'] = jsonEncode(
+        item
+            .rawFiles()
+            .map((source) => DownloadArchive.relocate(source, newPath))
+            .toList(),
+      );
       if (item.path() != null) {
-        result['Path'] = item.path()!.replaceAll(oldPath, newPath);
+        result['Path'] = DownloadArchive.relocate(item.path()!, newPath);
       }
       item.result = result;
 

@@ -1,9 +1,9 @@
+import 'package:violet/services/download_archive.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:synchronized/synchronized.dart';
 import 'package:violet/database/query.dart';
@@ -68,7 +68,7 @@ class DownloadItemModel {
   List<String> filesWithoutThumbnail() {
     var rfiles = rawFiles();
     rfiles.removeWhere(
-      (element) => element.split('/').last.startsWith('thumbnail'),
+      (element) => DownloadArchive.entryName(element).startsWith('thumbnail'),
     );
     return rfiles;
   }
@@ -79,10 +79,11 @@ class DownloadItemModel {
           .map((e) => e as String)
           .toList();
       if (rfiles
-          .where((e) => e.split('/').last.startsWith('thumbnail'))
+          .where((e) => DownloadArchive.entryName(e).startsWith('thumbnail'))
           .isNotEmpty) {
         return rfiles.firstWhere(
-          (element) => element.split('/').last.startsWith('thumbnail'),
+          (element) =>
+              DownloadArchive.entryName(element).startsWith('thumbnail'),
         );
       }
     }
@@ -169,12 +170,14 @@ class Download {
     // extraction을 마치고 다운로드가 시작되기 직전 후라는 것임
     final files = jsonDecode(item.files()!) as List<dynamic>;
 
-    final exists = File(files[0] as String).existsSync();
+    final exists =
+        files.isNotEmpty && DownloadArchive.exists(files[0] as String);
     _isDownloadedFileExistsCache[id] = exists;
     return exists;
   }
 
   void appendDownloaded(int id, DownloadItemModel item) {
+    _isDownloadedFileExistsCache.remove(id);
     _downloadedChecker.add(id);
     _downloadedItems[id] = item;
   }

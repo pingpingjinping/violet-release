@@ -1,7 +1,7 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2025. violet-team. Licensed under the Apache-2.0 License.
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:violet/database/user/bookmark.dart';
 import 'package:violet/pages/common/toast.dart';
@@ -38,7 +38,7 @@ class ImageCropBookmark extends StatelessWidget {
               image:
                   isNetworkImage
                         ? NetworkImage(url, headers: headers)
-                        : FileImage(File(url)) as ImageProvider
+                        : DownloadImageProvider(url) as ImageProvider
                     ..resolve(ImageConfiguration.empty).addListener(
                       ImageStreamListener((imageInfo, _) {
                         aspectRatio =

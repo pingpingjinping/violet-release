@@ -1,3 +1,5 @@
+import 'package:violet/services/download_archive.dart';
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -121,9 +123,13 @@ class _ViewerThumbnailState extends State<ViewerThumbnail> {
               i,
               _buildTappableItem(
                 i,
-                Image.file(
-                  File(e),
-                  cacheWidth: width.toInt() ~/ 1.5,
+                Image(
+                  image: ResizeImage.resizeIfNeeded(
+                    width.toInt() ~/ 1.5,
+                    null,
+                    DownloadImageProvider(e),
+                  ),
+
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.cover,
                 ),
@@ -287,21 +293,22 @@ class _ViewerThumbnailState extends State<ViewerThumbnail> {
             url,
             headers: headers,
           );
-        } else if (_pageInfo.useFileSystem) {
-          file = File(_pageInfo.uris[i]);
         }
+        final source = file?.path ?? _pageInfo.uris[i];
+        final bytes = await DownloadArchive.read(source);
 
         infoText += '\n';
 
         try {
-          final image = await decodeImageFromList(file!.readAsBytesSync());
+          final image = await decodeImageFromList(bytes);
 
           infoText +=
               'size: ${toStringWithComma(image.width.toString())}x${toStringWithComma(image.height.toString())}\n';
+          image.dispose();
         } catch (_) {}
         infoText +=
-            'length: ${toStringWithComma((await file!.length() ~/ 1024).toString())}KB\n';
-        infoText += 'filename: ${file.path}';
+            'length: ${toStringWithComma((bytes.length ~/ 1024).toString())}KB\n';
+        infoText += 'filename: $source';
       }
 
       AlertDialog alert = AlertDialog(content: SelectableText(infoText));
