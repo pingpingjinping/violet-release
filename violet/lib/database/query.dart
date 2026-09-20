@@ -27,6 +27,14 @@ class QueryResult {
       ?.split('|')
       .any((tag) => tag.trim().toLowerCase() == 'expunged') ??
       false;
+  bool existsOnHitomi() {
+    final value = result['ExistOnHitomi'];
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    return value?.toString() == '1';
+  }
+
+  bool isExpungedOnly() => isExpunged() && !existsOnHitomi();
 
   // For E/Ex Hentai
   publishedeh() => result['PublishedEH'];

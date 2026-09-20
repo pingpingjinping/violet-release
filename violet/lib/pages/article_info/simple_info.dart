@@ -43,6 +43,7 @@ class _SimpleInfoWidgetState extends State<SimpleInfoWidget> {
               thumbnail(context, data),
               bookmark(data),
               downloadMarker(data),
+              if (data.queryResult.isExpungedOnly()) expungedOnlyMarker(),
             ],
           ),
           Expanded(
@@ -139,6 +140,28 @@ class _SimpleInfoWidgetState extends State<SimpleInfoWidget> {
                     ),
                   ),
           );
+  }
+
+  Widget expungedOnlyMarker() {
+    return Positioned(
+      right: 12,
+      top: 12,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.deepOrange.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Text(
+          'EX',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget bookmark(ArticleInfo data) {

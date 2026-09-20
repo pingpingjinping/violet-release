@@ -60,9 +60,6 @@ class ThumbnailWidget extends StatelessWidget {
                     articleId: c.articleListItem.queryResult.id(),
                     greyScale: greyScale,
                   ),
-                  ExpungedIndicatorWidget(
-                    visible: c.articleListItem.queryResult.isExpunged(),
-                  ),
                   Obx(
                     () => ReadProgressOverlayWidget(
                       imageCount: c.imageCount.value,
@@ -351,37 +348,6 @@ class _DownloadIndicatorWidgetState extends State<DownloadIndicatorWidget> {
                 Shadow(color: Colors.black54, blurRadius: 2),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ExpungedIndicatorWidget extends StatelessWidget {
-  final bool visible;
-
-  const ExpungedIndicatorWidget({super.key, required this.visible});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!visible) return const SizedBox.shrink();
-
-    return Align(
-      alignment: FractionalOffset.topRight,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(4, 12, 4, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.deepOrange.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Text(
-          'EXPUNGED',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
           ),
         ),
       ),
