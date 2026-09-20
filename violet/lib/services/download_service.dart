@@ -80,15 +80,33 @@ class DownloadService {
         .toList();
   }
 
-  Future<void> enqueue(String url, {QueryResult? queryResult}) async {
+  Future<bool> isActiveDownload(String url) async {
     await initialize();
-    await _submission.synchronized(() async {
+    return _hasActiveDownload(url);
+  }
+
+  Future<bool> enqueue(String url, {QueryResult? queryResult}) async {
+    await initialize();
+    return _submission.synchronized(() async {
+      if (await _hasActiveDownload(url)) return false;
+
       final item = await (await Download.getInstance()).createNew(url);
       item.download = true;
       item.queryResult = queryResult;
       _start(item);
       changes.value++;
+      return true;
     });
+  }
+
+  Future<bool> _hasActiveDownload(String url) async {
+    final escapedUrl = url.replaceAll("'", "''");
+    final db = await CommonUserDatabase.getInstance();
+    final rows = await db.query(
+      "SELECT 1 FROM DownloadItem "
+      "WHERE URL='$escapedUrl' AND State BETWEEN 1 AND 4 LIMIT 1",
+    );
+    return rows.isNotEmpty;
   }
 
   void retry(DownloadItemModel item, {bool recover = false}) {

@@ -55,8 +55,11 @@ import 'package:violet/widgets/theme_switchable_state.dart';
 typedef StringCallback = Future Function(String);
 
 class DownloadPageManager {
-  static Future<void> add(QueryResult result) => DownloadService.instance
+  static Future<bool> add(QueryResult result) => DownloadService.instance
       .enqueue(result.id().toString(), queryResult: result);
+
+  static Future<bool> isActive(QueryResult result) =>
+      DownloadService.instance.isActiveDownload(result.id().toString());
 }
 
 // This page must remain alive until the app is closed.

@@ -321,6 +321,15 @@ class ArticleInfoPage extends StatelessWidget {
   }
 
   downloadButtonEvent(context, data) async {
+    if (await DownloadPageManager.isActive(data.queryResult)) {
+      showToast(
+        icon: Icons.downloading,
+        level: ToastLevel.check,
+        message: '이미 다운로드 대기 중이거나 진행 중입니다.',
+      );
+      return;
+    }
+
     if (Platform.isAndroid &&
         !Settings.useInnerStorage.value &&
         !await Permission.manageExternalStorage.isGranted) {
@@ -349,16 +358,24 @@ class ArticleInfoPage extends StatelessWidget {
       if (await showYesNoDialog(context, message) != true) return;
     }
 
+    await ScriptManager.refresh();
+
+    final added = await DownloadPageManager.add(data.queryResult);
+    if (!added) {
+      showToast(
+        icon: Icons.downloading,
+        level: ToastLevel.check,
+        message: '이미 다운로드 대기 중이거나 진행 중입니다.',
+      );
+      return;
+    }
+
     showToast(
       icon: Icons.download,
       level: ToastLevel.check,
       message:
           '${data.queryResult.id()}${Translations.instance!.trans('addtodownloadqueue')}',
     );
-
-    await ScriptManager.refresh();
-
-    await DownloadPageManager.add(data.queryResult);
     Navigator.pop(context);
   }
 
