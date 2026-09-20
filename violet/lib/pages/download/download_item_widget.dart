@@ -1,3 +1,5 @@
+import 'package:violet/services/download_archive.dart';
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -406,7 +408,7 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
       _cachedThumbnail =
           widget.item.state() == 0 &&
               widget.item.rawFiles().isNotEmpty &&
-              File(widget.item.rawFiles().first).existsSync()
+              DownloadArchive.exists(widget.item.rawFiles().first)
           ? _FileThumbnailWidget(
               showDetail: style.showDetail,
               thumbnailPath: widget.item.rawFiles().first,
@@ -784,10 +786,12 @@ class _FileThumbnailWidget extends StatelessWidget {
   Widget _thumbnailImage() {
     return Hero(
       tag: thumbnailTag,
-      child: ExtendedImage.file(
-        File(thumbnailPath),
+      child: ExtendedImage(
+        image: ExtendedResizeImage.resizeIfNeeded(
+          provider: DownloadImageProvider(thumbnailPath),
+          cacheWidth: usingRawImage ? height.toInt() * 2 : null,
+        ),
         fit: BoxFit.cover,
-        cacheWidth: usingRawImage ? height.toInt() * 2 : null,
         loadStateChanged: (state) {
           if (state.extendedImageLoadState == LoadState.loading ||
               state.extendedImageLoadState == LoadState.failed) {

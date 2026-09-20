@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:violet/services/download_archive.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -187,7 +187,7 @@ class DownloadService {
         await routine.setFailed('일부 페이지를 받지 못했습니다. 재시도하면 누락된 페이지를 받습니다.');
       } else {
         await routine.setDownloadComplete();
-        completed.value = job.item;
+        if (!job.cancelled) completed.value = job.item;
       }
     } catch (error) {
       if (!job.cancelled) await routine.setFailed(error.toString());
@@ -216,10 +216,7 @@ class DownloadService {
       await job.finished;
     }
     if (item.state() == 0) {
-      for (final filename in item.rawFiles()) {
-        final file = File(filename);
-        if (await file.exists()) await file.delete();
-      }
+      await DownloadArchive.deleteSources(item.rawFiles());
     }
     await item.delete();
     _jobs.remove(item.id());

@@ -1,0 +1,46 @@
+name: App ZIP download checks
+on:
+  pull_request:
+    paths:
+      - 'violet/lib/**'
+      - 'violet/test/download_archive_test.dart'
+      - '.github/workflows/zip-download-checks.yml'
+permissions:
+  contents: read
+jobs:
+  zip-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: violet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          cache: true
+      - run: flutter pub get
+      - name: Prepare existing test-only server stubs
+        run: |
+          printf '%s\n' 'String getValid(String vToken) { return vToken; }' > lib/server/salt.dart
+          printf '%s\n' 'String getValid(String vToken) { return vToken; }' > lib/server/wsalt.dart
+      - name: Analyze ZIP storage and reader integration
+        run: >-
+          flutter analyze --no-fatal-infos
+          lib/services/download_archive.dart
+          lib/services/download_image_provider.dart
+          lib/services/download_service.dart
+          lib/database/user/download.dart
+          lib/pages/download/download_routine.dart
+          lib/pages/download/download_page.dart
+          lib/pages/download/download_item_widget.dart
+          lib/pages/viewer/horizontal_viewer_page.dart
+          lib/pages/viewer/image/file_image.dart
+          lib/pages/viewer/image/image_crop_bookmark.dart
+          lib/pages/viewer/overlay/viewer_thumbnails.dart
+          lib/pages/viewer/overlay/viewer_gallery.dart
+          lib/pages/viewer/overlay/viewer_overlay.dart
+          test/download_archive_test.dart
+      - name: Verify ZIP round trips, decoder and download queue
+        run: flutter test test/download_archive_test.dart test/download_service_test.dart

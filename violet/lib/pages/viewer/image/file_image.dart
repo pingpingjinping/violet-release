@@ -1,7 +1,6 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
-
-import 'dart:io';
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
@@ -61,14 +60,19 @@ class _FileImageState extends State<FileImage> {
 
   @override
   Widget build(BuildContext context) {
-    final image = ExtendedImage.file(
-      File(widget.path),
+    final image = ExtendedImage(
+      image: ExtendedResizeImage.resizeIfNeeded(
+        provider: DownloadImageProvider(
+          widget.path,
+          imageCacheName: widget.path,
+        ),
+        imageCacheName: widget.path,
+        cacheWidth: Settings.useLowPerf.value
+            ? (MediaQuery.of(context).size.width * 2.0).toInt()
+            : null,
+      ),
       fit: BoxFit.contain,
-      imageCacheName: widget.path,
       filterQuality: SettingsWrapper.getImageQuality(c.imgQuality.value),
-      cacheWidth: Settings.useLowPerf.value
-          ? (MediaQuery.of(context).size.width * 2.0).toInt()
-          : null,
       clearMemoryCacheWhenDispose: true,
       loadStateChanged: _loadStateChanged,
     );

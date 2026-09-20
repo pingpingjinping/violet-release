@@ -3,6 +3,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:violet/services/download_archive.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:path/path.dart';
@@ -201,11 +202,38 @@ class DownloadRoutine {
   }
 
   Future<void> setDownloadComplete() async {
+    final originals = tasks!.map((task) => task.downloadPath!).toList();
+    final archivePath = join(
+      result['Path'] as String,
+      'download-${item.id()}.zip',
+    );
+    final entries = await DownloadArchive.create(archivePath, originals);
+    if (shouldCancel?.call() ?? false) {
+      await DownloadArchive.deleteSources(entries);
+      return;
+    }
+    final previous = Map<String, dynamic>.from(result);
+    result['Files'] = jsonEncode(entries);
+    result['Path'] = archivePath;
+    result['ErrorMsg'] = null;
+    try {
+      await _setState(0);
+    } catch (_) {
+      result = previous;
+      item.result = previous;
+      await DownloadArchive.deleteSources(entries);
+      rethrow;
+    }
     (await Download.getInstance()).appendDownloaded(
       int.parse(item.url()),
       item,
     );
-    await _setState(0);
+    // A cleanup failure must not turn a valid, committed ZIP into a failed job.
+    try {
+      await DownloadArchive.deleteSources(originals);
+    } catch (error) {
+      debugPrint('Could not remove temporary download pages: $error');
+    }
   }
 
   Future<void> _setState(int state) async {

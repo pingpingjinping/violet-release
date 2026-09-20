@@ -1,7 +1,6 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
-
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:extended_image/extended_image.dart';
@@ -258,8 +257,8 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
               wrappingGestureDetector(
                 Image(
                   image:
-                      ExtendedFileImageProvider(
-                          File(c.provider.uris[firstIndex]),
+                      DownloadImageProvider(
+                          c.provider.uris[firstIndex],
                           imageCacheName: c.provider.uris[firstIndex],
                         )
                         ..resolve(ImageConfiguration.empty).addListener(
@@ -284,8 +283,8 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
               wrappingGestureDetector(
                 Image(
                   image:
-                      ExtendedFileImageProvider(
-                          File(c.provider.uris[secondIndex]),
+                      DownloadImageProvider(
+                          c.provider.uris[secondIndex],
                           imageCacheName: c.provider.uris[secondIndex],
                         )
                         ..resolve(ImageConfiguration.empty).addListener(
@@ -310,8 +309,8 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
         );
       } else {
         viewWidget = PhotoView(
-          imageProvider: ExtendedFileImageProvider(
-            File(c.provider.uris[index]),
+          imageProvider: DownloadImageProvider(
+            c.provider.uris[index],
             imageCacheName: c.provider.uris[index],
           ),
           filterQuality: SettingsWrapper.imageQuality,

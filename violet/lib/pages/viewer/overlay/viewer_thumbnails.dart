@@ -1,3 +1,4 @@
+import 'package:violet/services/download_image_provider.dart';
 // This source code is a part of Project Violet.
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
@@ -121,9 +122,13 @@ class _ViewerThumbnailState extends State<ViewerThumbnail> {
               i,
               _buildTappableItem(
                 i,
-                Image.file(
-                  File(e),
-                  cacheWidth: width.toInt() ~/ 1.5,
+                Image(
+                  image: ResizeImage.resizeIfNeeded(
+                    width.toInt() ~/ 1.5,
+                    null,
+                    DownloadImageProvider(e),
+                  ),
+
                   filterQuality: FilterQuality.high,
                   fit: BoxFit.cover,
                 ),
