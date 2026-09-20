@@ -3,6 +3,9 @@
 
 import 'package:violet/settings/settings.dart';
 
+const _visibleGalleryCondition =
+    "(ExistOnHitomi=1 OR Tags LIKE '%|expunged|%')";
+
 /// Translate search query to sql query
 String translate2query(String query, {bool filter = true}) {
   query = query.trim();
@@ -14,7 +17,7 @@ String translate2query(String query, {bool filter = true}) {
   final filterExistsOnHitomi = !Settings.searchPure.value && filter;
 
   if (query.isEmpty) {
-    return 'SELECT * FROM HitomiColumnModel ${filterExistsOnHitomi ? 'WHERE ExistOnHitomi=1' : ''}';
+    return 'SELECT * FROM HitomiColumnModel ${filterExistsOnHitomi ? 'WHERE $_visibleGalleryCondition' : ''}';
   }
 
   final tokens = _splitTokens(
@@ -22,7 +25,7 @@ String translate2query(String query, {bool filter = true}) {
   ).map((x) => x.trim()).where((x) => x != '').toList();
   final where = _QueryTranslator(tokens).parseExpression();
 
-  return 'SELECT * FROM HitomiColumnModel WHERE $where ${filterExistsOnHitomi ? ' AND ExistOnHitomi=1' : ''}';
+  return 'SELECT * FROM HitomiColumnModel WHERE $where ${filterExistsOnHitomi ? ' AND $_visibleGalleryCondition' : ''}';
 }
 
 List<String> _splitTokens(String tokens) {
