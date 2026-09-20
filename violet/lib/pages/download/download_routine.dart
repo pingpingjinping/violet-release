@@ -203,10 +203,8 @@ class DownloadRoutine {
 
   Future<void> setDownloadComplete() async {
     final originals = tasks!.map((task) => task.downloadPath!).toList();
-    final archivePath = join(
-      result['Path'] as String,
-      'download-${item.id()}.zip',
-    );
+    final workingPath = result['Path'] as String;
+    final archivePath = join(dirname(workingPath), '${item.url()}.zip');
     final entries = await DownloadArchive.create(archivePath, originals);
     if (shouldCancel?.call() ?? false) {
       await DownloadArchive.deleteSources(entries);
@@ -231,6 +229,11 @@ class DownloadRoutine {
     // A cleanup failure must not turn a valid, committed ZIP into a failed job.
     try {
       await DownloadArchive.deleteSources(originals);
+      final workingDirectory = Directory(workingPath);
+      if (await workingDirectory.exists() &&
+          await workingDirectory.list().isEmpty) {
+        await workingDirectory.delete();
+      }
     } catch (error) {
       debugPrint('Could not remove temporary download pages: $error');
     }
