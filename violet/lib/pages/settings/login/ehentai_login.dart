@@ -5,7 +5,6 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -68,8 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {}
 
     final cookies = parseCookies(cookieString as String);
-    developer.log('Get cookies: $cookies');
-
     if (cookies.containsKey('ipb_member_id') &&
         cookies.containsKey('ipb_pass_hash') &&
         (cookies.containsKey('sk') || cookies.containsKey('igneous'))) {
