@@ -18,8 +18,10 @@ class ServerConfig {
         uri.hasFragment) {
       throw const FormatException('IP 또는 http/https 서버 주소를 입력해 주세요.');
     }
-    final normalized = !text.contains('://') && !RegExp(r':\d+$').hasMatch(text.split('/').first)
-        ? uri.replace(port: 3001) : uri;
+    final normalized = !text.contains('://') &&
+            !RegExp(r':\d+$').hasMatch(text.split('/').first)
+        ? uri.replace(port: 3001)
+        : uri;
     return normalized.toString().replaceFirst(RegExp(r'/+$'), '');
   }
 
@@ -38,34 +40,12 @@ class ServerConfig {
   static String endpoint(String base, String path) {
     final root = base.trim();
     if (root.isEmpty) return '';
-    return '${root.replaceFirst(RegExp(r'/+
+    return '${root.replaceFirst(RegExp(r'/+$'), '')}/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  }
 
   // Keep public CDN downloads; repair LAN URLs advertised with an old IP.
   static String downloadUrl(String url, String base) {
     if (base.trim().isEmpty) return url;
-    final uri = Uri.parse(url);
-    final host = uri.host;
-    final parts = host.split('.');
-    final private =
-        host == 'localhost' ||
-        host == '127.0.0.1' ||
-        host == '::1' ||
-        host.startsWith('192.168.') ||
-        host.startsWith('10.') ||
-        (parts.length == 4 &&
-            parts[0] == '172' &&
-            (int.tryParse(parts[1]) ?? 0) >= 16 &&
-            (int.tryParse(parts[1]) ?? 0) <= 31);
-    if (!private && host != Uri.parse(base).host) return url;
-    return endpoint(databaseBase(base), uri.path) +
-        (uri.hasQuery ? '?${uri.query}' : '');
-  }
-}
-), '')}/${path.replaceFirst(RegExp(r'^/+'), '')}';
-  }
-
-  // Keep public CDN downloads; repair LAN URLs advertised with an old IP.
-  static String downloadUrl(String url, String base) {
     final uri = Uri.parse(url);
     final host = uri.host;
     final parts = host.split('.');
