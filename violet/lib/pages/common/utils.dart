@@ -65,36 +65,59 @@ Future showArticleInfoRaw({
     defaultShowHeight = (height * 0.85).toInt();
   }
 
-  // https://github.com/flutter/flutter/issues/67219
+  // The mobile preview used to start exactly at minChildSize. On newer
+  // Flutter versions that leaves no extent for the first downward drag to
+  // consume, so the nested scrollable wins the gesture without dismissing the
+  // modal. Give it one logical pixel of drag runway and close explicitly when
+  // that drag reaches the minimum extent.
+  final minChildSize = 400 / height;
+  final initialChildSize = defaultShowHeight / height;
+  final dismissibleInitialChildSize = initialChildSize <= minChildSize
+      ? minChildSize + (1 / height)
+      : initialChildSize;
+  var dismissing = false;
+
   Provider<ArticleInfo>? cache;
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
-    // route sheet and the article list compete for the first downward drag.
+    // Keep one drag owner. The inner DraggableScrollableSheet still handles
+    // expansion and scrolling; the notification below handles dismissal.
     enableDrag: false,
-    builder: (_) {
-      return DraggableScrollableSheet(
-        initialChildSize: defaultShowHeight / height,
-        minChildSize: 400 / height,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) {
-          cache ??= Provider<ArticleInfo>.value(
-            value: ArticleInfo.fromArticleInfo(
-              queryResult: queryResult,
-              thumbnail: thumbnail,
-              headers: headers,
-              heroKey: heroKey,
-              isBookmarked: isBookmarked,
-              controller: controller,
-              usableTabList: usableTabList,
-              lockRead: lockRead,
-            ),
-            child: const ArticleInfoPage(key: ObjectKey(pageKey)),
-          );
-          return cache!;
+    builder: (sheetContext) {
+      return NotificationListener<DraggableScrollableNotification>(
+        onNotification: (notification) {
+          if (!dismissing &&
+              notification.depth == 0 &&
+              notification.extent <= notification.minExtent &&
+              notification.extent < notification.initialExtent) {
+            dismissing = true;
+            Navigator.of(sheetContext).pop();
+          }
+          return false;
         },
+        child: DraggableScrollableSheet(
+          initialChildSize: dismissibleInitialChildSize,
+          minChildSize: minChildSize,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, controller) {
+            cache ??= Provider<ArticleInfo>.value(
+              value: ArticleInfo.fromArticleInfo(
+                queryResult: queryResult,
+                thumbnail: thumbnail,
+                headers: headers,
+                heroKey: heroKey,
+                isBookmarked: isBookmarked,
+                controller: controller,
+                usableTabList: usableTabList,
+                lockRead: lockRead,
+              ),
+              child: const ArticleInfoPage(key: ObjectKey(pageKey)),
+            );
+            return cache!;
+          },
+        ),
       );
     },
   );
@@ -203,34 +226,51 @@ Future<void> showArticleInfoNotFound(
   final isBookmarked = await (await Bookmark.getInstance()).isBookmark(id);
 
   if (!context.mounted) return;
+  final minChildSize = 400 / height;
+  final initialChildSize = defaultShowHeight / height;
+  final dismissibleInitialChildSize = initialChildSize <= minChildSize
+      ? minChildSize + (1 / height)
+      : initialChildSize;
+  var dismissing = false;
+
   Provider<ArticleInfo>? cache;
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    // Let the inner DraggableScrollableSheet own the gesture. Otherwise the
-    // route sheet and the article list compete for the first downward drag.
     enableDrag: false,
-    builder: (_) {
-      return DraggableScrollableSheet(
-        initialChildSize: defaultShowHeight / height,
-        minChildSize: 400 / height,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) {
-          cache ??= Provider<ArticleInfo>.value(
-            value: ArticleInfo.fromArticleInfo(
-              queryResult: fallbackQueryResult,
-              thumbnail: null,
-              headers: null,
-              heroKey: heroKey,
-              isBookmarked: isBookmarked,
-              controller: controller,
-              lockRead: true,
-            ),
-            child: const ArticleInfoPage(key: ObjectKey(pageKey)),
-          );
-          return cache!;
+    builder: (sheetContext) {
+      return NotificationListener<DraggableScrollableNotification>(
+        onNotification: (notification) {
+          if (!dismissing &&
+              notification.depth == 0 &&
+              notification.extent <= notification.minExtent &&
+              notification.extent < notification.initialExtent) {
+            dismissing = true;
+            Navigator.of(sheetContext).pop();
+          }
+          return false;
         },
+        child: DraggableScrollableSheet(
+          initialChildSize: dismissibleInitialChildSize,
+          minChildSize: minChildSize,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, controller) {
+            cache ??= Provider<ArticleInfo>.value(
+              value: ArticleInfo.fromArticleInfo(
+                queryResult: fallbackQueryResult,
+                thumbnail: null,
+                headers: null,
+                heroKey: heroKey,
+                isBookmarked: isBookmarked,
+                controller: controller,
+                lockRead: true,
+              ),
+              child: const ArticleInfoPage(key: ObjectKey(pageKey)),
+            );
+            return cache!;
+          },
+        ),
       );
     },
   );
