@@ -20,6 +20,7 @@ import 'package:violet/pages/segment/filter_page_controller.dart';
 import 'package:violet/script/script_manager.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/thread/semaphore.dart';
+import 'package:violet/util/call_once.dart';
 
 class SearchPageController extends GetxController {
   final FlareControls heroFlareControls = FlareControls();
@@ -176,19 +177,28 @@ class SearchPageController extends GetxController {
   }
 
   loadNextQuery() async {
-    final aquire = _querySem.acquire();
-    if (!Settings.ignoreTimeout.value) {
-      aquire.timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          showErrorToast('Semaphore acquisition failed');
-
-          throw TimeoutException('Failed to acquire the query semaphore');
-        },
-      );
+    final acquire = _querySem.acquire();
+    late final CallOnce permit;
+    if (Settings.ignoreTimeout.value) {
+      permit = await acquire;
+    } else {
+      try {
+        permit = await acquire.timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            showErrorToast('Semaphore acquisition failed');
+            throw TimeoutException('Failed to acquire the query semaphore');
+          },
+        );
+      } on TimeoutException {
+        // Future.timeout does not cancel the original acquire. Release the
+        // permit if it completes later so the semaphore cannot get stuck.
+        unawaited(acquire.then<void>((latePermit) => latePermit()));
+        rethrow;
+      }
     }
-    await aquire;
 
+    var releasePermit = true;
     try {
       if (_queryEnd ||
           (latestQuery!.$1 != null && latestQuery!.$1!.offset == -1)) {
@@ -200,17 +210,33 @@ class SearchPageController extends GetxController {
         latestQuery!.$1 == null ? 0 : latestQuery!.$1!.offset,
         latestQuery!.$1 == null ? 0 : latestQuery!.$1!.next ?? 0,
       );
-      if (!Settings.ignoreTimeout.value) {
-        search.timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            Logger.error('[Search_loadNextQuery] Search Timeout');
 
-            throw TimeoutException('Failed to search the query');
-          },
-        );
+      late final SearchResult next;
+      if (Settings.ignoreTimeout.value) {
+        next = await search;
+      } else {
+        try {
+          next = await search.timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              Logger.error('[Search_loadNextQuery] Search Timeout');
+              throw TimeoutException('Failed to search the query');
+            },
+          );
+        } on TimeoutException {
+          // The underlying search keeps running after Future.timeout. Keep the
+          // semaphore held until it actually finishes to avoid overlapping
+          // database/network searches.
+          releasePermit = false;
+          unawaited(
+            search.then<void>(
+              (_) => permit(),
+              onError: (Object _, StackTrace __) => permit(),
+            ),
+          );
+          rethrow;
+        }
       }
-      var next = await search;
 
       latestQuery = (next, latestQuery!.$2);
 
@@ -245,7 +271,7 @@ class SearchPageController extends GetxController {
       );
       rethrow;
     } finally {
-      _querySem.release();
+      if (releasePermit) permit();
     }
   }
 
