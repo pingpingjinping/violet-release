@@ -29,6 +29,7 @@ class ScriptManager {
   static String? scriptCache;
   static late JavascriptRuntime runtime;
   static late DateTime latestUpdate;
+  static DateTime? _latestRefreshAttempt;
 
   // static Future<void> init() async {
   //   Future fallbackFail(Future Function() fn) async {
@@ -74,6 +75,15 @@ class ScriptManager {
   // }
 
   static Future<void> refresh() async {
+    // Avoid hitting gg.js on every search/article open. The previous throttle
+    // ran only after the V4 request, so successful V4 refreshes bypassed it.
+    final now = DateTime.now();
+    if (_latestRefreshAttempt != null &&
+        now.difference(_latestRefreshAttempt!).inMinutes < 5) {
+      return;
+    }
+    _latestRefreshAttempt = now;
+
     // 1. (V4) NoWebView가 활성화되어 있다면 해당 방법으로 refresh 시도, 아니라면 webview로 시도
     if (enableRefreshV4NoWebView) {
       if (await refreshV4NoWebView()) {
@@ -86,11 +96,6 @@ class ScriptManager {
     }
 
     // 2. (V3) V4 disable 상태이거나 no web-view가 실패한다면 V3로 fallback한다
-    // 너무 잦은 refresh try를 방지하기 위해 많아도 5분에 한 번씩만 실행되게 끔 설정
-    if (DateTime.now().difference(latestUpdate).inMinutes < 5) {
-      return;
-    }
-
     await refreshV3();
   }
 

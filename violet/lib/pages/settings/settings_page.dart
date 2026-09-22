@@ -91,6 +91,19 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
   bool _shouldReload = false;
 
   @override
+  void initState() {
+    super.initState();
+    doubleTapToTopScrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    doubleTapToTopScrollController?.dispose();
+    doubleTapToTopScrollController = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final double statusBarHeight = MediaQuery.of(context).padding.top;
@@ -118,7 +131,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
     return SingleChildScrollView(
       padding: EdgeInsets.only(top: statusBarHeight),
       physics: const BouncingScrollPhysics(),
-      controller: doubleTapToTopScrollController = ScrollController(),
+      controller: doubleTapToTopScrollController,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: _cachedGroups!,
