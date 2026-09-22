@@ -326,7 +326,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           keyboardType: TextInputType.url,
           decoration: const InputDecoration(
             labelText: '작품 서버 주소',
-            hintText: 'http://192.168.0.39:3001',
+            hintText: 'http://서버주소:3001',
           ),
         ),
         const SizedBox(height: 16),
