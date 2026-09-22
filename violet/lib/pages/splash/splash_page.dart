@@ -15,6 +15,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:intl/intl.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -68,6 +69,11 @@ class _SplashPageState extends State<SplashPage> {
   String? _contentStage;
   int _contentReceived = 0;
   int _contentTotal = 0;
+  int _contentBytesPerSecond = 0;
+  int _contentSpeedSampleReceived = 0;
+  DateTime? _contentSpeedSampleAt;
+
+  static final NumberFormat _contentNumberFormatter = NumberFormat('#,###.#');
 
   final imgSize = {
     'dummy': '0MB',
@@ -171,17 +177,17 @@ class _SplashPageState extends State<SplashPage> {
     if (prefs.getInt('db_exists') == 1 && !widget.switching) {
       await ContentDbSync.startup(
         canApply: () => mounted,
-        onProgress: (stage, received, total) {
-          if (!mounted) return;
-          setState(() {
-            _contentStage = stage;
-            _contentReceived = received;
-            _contentTotal = total;
-          });
-        },
+        onProgress: _updateContentProgress,
       );
       if (!mounted) return;
-      setState(() => _contentStage = null);
+      setState(() {
+        _contentStage = null;
+        _contentReceived = 0;
+        _contentTotal = 0;
+        _contentBytesPerSecond = 0;
+        _contentSpeedSampleReceived = 0;
+        _contentSpeedSampleAt = null;
+      });
 
       var connectivityResult = await (Connectivity().checkConnectivity());
       if ((prefs.getBool('auto_content_db_update') ?? true) &&
@@ -268,6 +274,98 @@ class _SplashPageState extends State<SplashPage> {
     startTime();
   }
 
+  void _updateContentProgress(String stage, int received, int total) {
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    var bytesPerSecond = _contentBytesPerSecond;
+
+    if (stage != _contentStage) {
+      _contentSpeedSampleAt = now;
+      _contentSpeedSampleReceived = received;
+      bytesPerSecond = 0;
+    } else if (stage == 'DB 다운로드 중') {
+      final sampleAt = _contentSpeedSampleAt;
+      if (sampleAt == null) {
+        _contentSpeedSampleAt = now;
+        _contentSpeedSampleReceived = received;
+      } else {
+        final elapsedMs = now.difference(sampleAt).inMilliseconds;
+        if (elapsedMs >= 500) {
+          final delta = received - _contentSpeedSampleReceived;
+          if (delta >= 0) {
+            bytesPerSecond = (delta * 1000 / elapsedMs).round();
+          }
+          _contentSpeedSampleAt = now;
+          _contentSpeedSampleReceived = received;
+        }
+      }
+    }
+
+    setState(() {
+      _contentStage = stage;
+      _contentReceived = received;
+      _contentTotal = total;
+      _contentBytesPerSecond = bytesPerSecond;
+    });
+  }
+
+  String _formatContentNumber(num value) =>
+      _contentNumberFormatter.format(value).replaceAll(' ', '');
+
+  Widget _contentDatabaseOverlay() {
+    final stage = _contentStage!;
+    final downloading = stage == 'DB 다운로드 중';
+    final progress = _contentTotal > 0
+        ? '${_formatContentNumber(_contentReceived / _contentTotal * 100)}%'
+        : '';
+    final amount = _contentTotal > 0
+        ? '[${_formatContentNumber(_contentReceived)}/${_formatContentNumber(_contentTotal)}]'
+        : '';
+    final speed = downloading && _contentBytesPerSecond > 0
+        ? '${_formatContentNumber(_contentBytesPerSecond / 1024)} KB/s'
+        : '';
+
+    return Positioned.fill(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(Translations.instance!.trans('dbdname')),
+          backgroundColor: Colors.purple,
+        ),
+        body: Center(
+          child: downloading
+              ? SizedBox(
+                  height: 170.0,
+                  width: 240.0,
+                  child: Card(
+                    color: Colors.black,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 20.0),
+                        Text(
+                          '${Translations.instance!.trans('dbddownloading')} $progress',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        Text(
+                          amount,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        Text(
+                          speed,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Text(stage),
+        ),
+      ),
+    );
+  }
+
   Database? _database;
 
   void _setDatabase(Database? database) {
@@ -282,76 +380,45 @@ class _SplashPageState extends State<SplashPage> {
     var width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 1000),
-              curve: Curves.ease,
-              top: showFirst ? 130 : height / 2 - 50,
-              left: width / 2 - 50,
-              child: Image.asset(
-                'assets/images/logo-${Settings.majorColor.value.name}.png',
-                width: 100,
-                height: 100,
-              ),
-            ),
-            Visibility(
-              visible: showFirst,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 250),
-                  child: Text(
-                    Translations.instance!.trans('fontsizewarning'),
-                    style: const TextStyle(fontSize: 12),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Stack(
+              children: <Widget>[
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.ease,
+                  top: showFirst ? 130 : height / 2 - 50,
+                  left: width / 2 - 50,
+                  child: Image.asset(
+                    'assets/images/logo-${Settings.majorColor.value.name}.png',
+                    width: 100,
+                    height: 100,
                   ),
                 ),
-              ),
-            ),
-            _showMessage(),
-            _chunkDownload(),
-            _firstPage(),
-            _dbSelector(),
-            _languageSelector(),
-            if (_contentStage != null)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: Settings.majorColor.value,
-                  child: Center(
+                Visibility(
+                  visible: showFirst,
+                  child: Align(
+                    alignment: Alignment.topCenter,
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _contentStage!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          LinearProgressIndicator(
-                            value: _contentTotal > 0
-                                ? _contentReceived / _contentTotal
-                                : null,
-                          ),
-                          if (_contentTotal > 0) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              '${(_contentReceived / _contentTotal * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ],
-                        ],
+                      padding: const EdgeInsets.only(top: 250),
+                      child: Text(
+                        Translations.instance!.trans('fontsizewarning'),
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
+                _showMessage(),
+                _chunkDownload(),
+                _firstPage(),
+                _dbSelector(),
+                _languageSelector(),
+              ],
+            ),
+          ),
+          if (_contentStage != null) _contentDatabaseOverlay(),
+        ],
       ),
       backgroundColor: showFirst && !widget.switching
           ? const Color(0x7FB200ED)
