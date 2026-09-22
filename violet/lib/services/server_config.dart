@@ -1,10 +1,11 @@
 import 'package:violet/settings/settings.dart';
 
 class ServerConfig {
-  static const defaultUrl = 'http://192.168.0.39:3001';
+  static const defaultUrl = '';
   static String get webBase =>
-      Settings.prefs.getString('content_server_url') ?? defaultUrl;
-  static String get dbBase => databaseBase(webBase);
+      (Settings.prefs.getString('content_server_url') ?? defaultUrl).trim();
+  static bool get configured => webBase.isNotEmpty;
+  static String get dbBase => configured ? databaseBase(webBase) : '';
 
   static String normalize(String input) {
     final text = input.trim();
@@ -23,17 +24,45 @@ class ServerConfig {
   }
 
   static String databaseBase(String base) {
+    if (base.trim().isEmpty) return '';
     final uri = Uri.parse(normalize(base));
     return (uri.port == 3001 ? uri.replace(port: 3002) : uri).toString();
   }
 
   static String apiBase(String base) {
+    if (base.trim().isEmpty) return '';
     final uri = Uri.parse(normalize(base));
     return (uri.port == 3002 ? uri.replace(port: 3001) : uri).toString();
   }
 
-  static String endpoint(String base, String path) =>
-      '${base.replaceFirst(RegExp(r'/+$'), '')}/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  static String endpoint(String base, String path) {
+    final root = base.trim();
+    if (root.isEmpty) return '';
+    return '${root.replaceFirst(RegExp(r'/+
+
+  // Keep public CDN downloads; repair LAN URLs advertised with an old IP.
+  static String downloadUrl(String url, String base) {
+    if (base.trim().isEmpty) return url;
+    final uri = Uri.parse(url);
+    final host = uri.host;
+    final parts = host.split('.');
+    final private =
+        host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.') ||
+        (parts.length == 4 &&
+            parts[0] == '172' &&
+            (int.tryParse(parts[1]) ?? 0) >= 16 &&
+            (int.tryParse(parts[1]) ?? 0) <= 31);
+    if (!private && host != Uri.parse(base).host) return url;
+    return endpoint(databaseBase(base), uri.path) +
+        (uri.hasQuery ? '?${uri.query}' : '');
+  }
+}
+), '')}/${path.replaceFirst(RegExp(r'^/+'), '')}';
+  }
 
   // Keep public CDN downloads; repair LAN URLs advertised with an old IP.
   static String downloadUrl(String url, String base) {
