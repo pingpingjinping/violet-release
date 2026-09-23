@@ -181,17 +181,7 @@ class ScriptManager {
 
   static Future<ImageList?> runHitomiGetImageList(int id) async {
     try {
-      final imageUrls = await HitomiImageResolver.getImages(id);
-      final bigThumbnailUrls = await HitomiImageResolver.getBigThumbnailUrls(
-        id,
-      );
-      final smallThumbnailUrls =
-          await HitomiImageResolver.getSmallThumbnailUrls(id);
-      return ImageList(
-        urls: imageUrls,
-        bigThumbnails: bigThumbnailUrls,
-        smallThumbnails: smallThumbnailUrls,
-      );
+      return await HitomiImageResolver.getImageList(id);
     } catch (e, st) {
       Logger.error(
         '[script-HitomiGetImageList] E: $e\n'
@@ -245,190 +235,132 @@ class HitomiImageResolver {
   // Credits to https://discord.com/users/1407344738750824459
   static const String baseDomain = 'gold-usergeneratedcontent.net';
 
-  static Future<List<String>> getImages(
+  static Future<ImageList> getImageList(
     int galleryId, {
     bool useAvif = false,
   }) async {
     try {
-      // 1. gg.js 해석 (완벽한 mList 추출 로직 적용)
+      // gg.js and gallery metadata are shared by the original image,
+      // big-thumbnail, and small-thumbnail URL builders. Fetch each once per
+      // gallery instead of repeating the same network work three times.
       final ggResponse = await http.get('https://ltn.$baseDomain/gg.js');
-      if (ggResponse.statusCode != 200) return [];
+      if (ggResponse.statusCode != 200) {
+        return const ImageList(
+          urls: [],
+          bigThumbnails: [],
+          smallThumbnails: [],
+        );
+      }
       final ggText = ggResponse.body;
 
       final bMatch = RegExp(r"b:\s*'([^']+)'").firstMatch(ggText);
-      final bValue = bMatch?.group(1) ?? "";
+      final bValue = bMatch?.group(1) ?? '';
 
       final mList = RegExp(
-        r"case (\d+):",
-      ).allMatches(ggText).map((m) => m.group(1)!).toList();
+        r'case (\d+):',
+      ).allMatches(ggText).map((m) => m.group(1)!).toSet();
 
       int o1 = 0;
       int o2 = 1;
-      final oMatches = RegExp(r"o = (\d+)").allMatches(ggText);
+      final oMatches = RegExp(r'o = (\d+)').allMatches(ggText);
       if (oMatches.isNotEmpty) {
-        o1 = int.parse(oMatches.first.group(1) ?? "0");
-        o2 = int.parse(oMatches.last.group(1) ?? "1");
+        o1 = int.parse(oMatches.first.group(1) ?? '0');
+        o2 = int.parse(oMatches.last.group(1) ?? '1');
       }
 
-      // 2. 갤러리 메타데이터 로드
       final galResponse = await http.get(
         'https://ltn.$baseDomain/galleries/$galleryId.js',
       );
-      if (galResponse.statusCode != 200) return [];
+      if (galResponse.statusCode != 200) {
+        return const ImageList(
+          urls: [],
+          bigThumbnails: [],
+          smallThumbnails: [],
+        );
+      }
 
-      String content = galResponse.body.replaceFirst('var galleryinfo = ', '');
+      final content = galResponse.body.replaceFirst('var galleryinfo = ', '');
       final Map<String, dynamic> data = json.decode(content);
       final List<dynamic> files = data['files'] ?? [];
 
-      // 3. 최신 공식 기반 URL 조립
-      List<String> imageUrls = [];
-      String domain = useAvif ? 'a' : 'w';
-      String ext = useAvif ? 'avif' : 'webp';
+      final imageUrls = <String>[];
+      final bigThumbnailUrls = <String>[];
+      final smallThumbnailUrls = <String>[];
 
-      for (var file in files) {
-        final String hash = file['hash'];
+      final imageDomain = useAvif ? 'a' : 'w';
+      final imageExt = useAvif ? 'avif' : 'webp';
+      final bigThumbnailPath = useAvif ? 'avifbigtn' : 'webpbigtn';
+      final smallThumbnailPath = useAvif
+          ? 'avifsmallsmalltn'
+          : 'webpsmalltn';
+
+      for (final file in files) {
+        final hash = file['hash'] as String;
         if (hash.isEmpty) continue;
 
-        // [핵심] 해시 문자 재조합 (끝 1글자 + 끝에서 3, 2번째 글자)
-        var part =
+        final part =
             hash[hash.length - 1] +
             hash[hash.length - 3] +
             hash[hash.length - 2];
-        String s = int.parse(part, radix: 16).toString(); // 16진수 -> 10진수
+        final s = int.parse(part, radix: 16).toString();
 
-        // 서버 라우팅 계산 (a1 or a2)
-        bool isModern = mList.contains(s);
-        int node = isModern ? o2 : o1;
-        int serverNum = node + 1;
+        final isModern = mList.contains(s);
+        final node = isModern ? o2 : o1;
+        final serverNum = node + 1;
 
-        // 최종 주소 완성 (ex: https://a1.gold.../1775551322/3988/hash.avif)
-        final finalUrl =
-            'https://$domain$serverNum.$baseDomain/$bValue$s/$hash.$ext';
-        imageUrls.add(finalUrl);
+        imageUrls.add(
+          'https://$imageDomain$serverNum.$baseDomain/'
+          '$bValue$s/$hash.$imageExt',
+        );
+
+        final thumbnailDomain = serverNum == 1 ? 'atn' : 'btn';
+        final secondPath = hash.substring(hash.length - 1);
+        final thirdPath = hash.substring(hash.length - 3, hash.length - 1);
+
+        bigThumbnailUrls.add(
+          'https://$thumbnailDomain.$baseDomain/'
+          '$bigThumbnailPath/$secondPath/$thirdPath/$hash.$imageExt',
+        );
+        smallThumbnailUrls.add(
+          'https://$thumbnailDomain.$baseDomain/'
+          '$smallThumbnailPath/$secondPath/$thirdPath/$hash.$imageExt',
+        );
       }
 
-      return imageUrls;
+      return ImageList(
+        urls: imageUrls,
+        bigThumbnails: bigThumbnailUrls,
+        smallThumbnails: smallThumbnailUrls,
+      );
     } catch (e) {
       print('[Hitomi Resolver] 에러: $e');
-      return [];
+      return const ImageList(
+        urls: [],
+        bigThumbnails: [],
+        smallThumbnails: [],
+      );
     }
+  }
+
+  static Future<List<String>> getImages(
+    int galleryId, {
+    bool useAvif = false,
+  }) async {
+    return (await getImageList(galleryId, useAvif: useAvif)).urls;
   }
 
   static Future<List<String>> getBigThumbnailUrls(
     int galleryId, {
     bool useAvif = false,
   }) async {
-    try {
-      final ggResponse = await http.get('https://ltn.$baseDomain/gg.js');
-      if (ggResponse.statusCode != 200) return [];
-      final ggText = ggResponse.body;
-
-      final mList = RegExp(
-        r"case (\d+):",
-      ).allMatches(ggText).map((m) => m.group(1)!).toList();
-
-      int o1 = 0;
-      int o2 = 1;
-      final oMatches = RegExp(r"o = (\d+)").allMatches(ggText);
-      if (oMatches.isNotEmpty) {
-        o1 = int.parse(oMatches.first.group(1) ?? "0");
-        o2 = int.parse(oMatches.last.group(1) ?? "1");
-      }
-      final galResponse = await http.get(
-        'https://ltn.$baseDomain/galleries/$galleryId.js',
-      );
-      if (galResponse.statusCode != 200) return [];
-      String content = galResponse.body.replaceFirst('var galleryinfo = ', '');
-      final Map<String, dynamic> data = json.decode(content);
-      final List<dynamic> files = data['files'] ?? [];
-      List<String> thumbUrls = [];
-      String firstPath = useAvif ? 'avifbigtn' : 'webpbigtn';
-      for (var file in files) {
-        final String hash = file['hash'];
-        if (hash.isEmpty) continue;
-        var part =
-            hash[hash.length - 1] +
-            hash[hash.length - 3] +
-            hash[hash.length - 2];
-        String s = int.parse(part, radix: 16).toString(); // 16진수 -> 10진수
-
-        // 서버 라우팅 계산 (a1 or a2)
-        bool isModern = mList.contains(s);
-        int node = isModern ? o2 : o1;
-        int serverNum = node + 1;
-        String domain = serverNum == 1 ? 'atn' : 'btn';
-        String secondPath = hash.substring(hash.length - 1, hash.length);
-        String thirdPath = hash.substring(hash.length - 3, hash.length - 1);
-        String ext = useAvif ? 'avif' : 'webp';
-        final thumbUrl =
-            'https://$domain.$baseDomain/$firstPath/$secondPath/$thirdPath/$hash.$ext';
-        thumbUrls.add(thumbUrl);
-      }
-      return thumbUrls;
-    } catch (e) {
-      print('[Hitomi Resolver] 에러: $e');
-      return [];
-    }
+    return (await getImageList(galleryId, useAvif: useAvif)).bigThumbnails;
   }
 
   static Future<List<String>> getSmallThumbnailUrls(
     int galleryId, {
     bool useAvif = false,
   }) async {
-    try {
-      // 1. gg.js 해석 (완벽한 mList 추출 로직 적용)
-      final ggResponse = await http.get('https://ltn.$baseDomain/gg.js');
-      if (ggResponse.statusCode != 200) return [];
-      final ggText = ggResponse.body;
-
-      final mList = RegExp(
-        r"case (\d+):",
-      ).allMatches(ggText).map((m) => m.group(1)!).toList();
-
-      int o1 = 0;
-      int o2 = 1;
-      final oMatches = RegExp(r"o = (\d+)").allMatches(ggText);
-      if (oMatches.isNotEmpty) {
-        o1 = int.parse(oMatches.first.group(1) ?? "0");
-        o2 = int.parse(oMatches.last.group(1) ?? "1");
-      }
-
-      final galResponse = await http.get(
-        'https://ltn.$baseDomain/galleries/$galleryId.js',
-      );
-      if (galResponse.statusCode != 200) return [];
-      String content = galResponse.body.replaceFirst('var galleryinfo = ', '');
-      final Map<String, dynamic> data = json.decode(content);
-      final List<dynamic> files = data['files'] ?? [];
-      List<String> thumbUrls = [];
-      String firstPath = useAvif ? 'avifsmallsmalltn' : 'webpsmalltn';
-      for (var file in files) {
-        final String hash = file['hash'];
-        if (hash.isEmpty) continue;
-        var part =
-            hash[hash.length - 1] +
-            hash[hash.length - 3] +
-            hash[hash.length - 2];
-        String s = int.parse(part, radix: 16).toString(); // 16진수 -> 10진수
-
-        // 서버 라우팅 계산 (a1 or a2)
-        bool isModern = mList.contains(s);
-        int node = isModern ? o2 : o1;
-        int serverNum = node + 1;
-        String domain = serverNum == 1 ? 'atn' : 'btn';
-
-        // 최종 주소 완성 (ex: https://a1.gold.../1775551322/3988/hash.avif)
-        String secondPath = hash.substring(hash.length - 1, hash.length);
-        String thirdPath = hash.substring(hash.length - 3, hash.length - 1);
-        String ext = useAvif ? 'avif' : 'webp';
-        final thumbUrl =
-            'https://$domain.$baseDomain/$firstPath/$secondPath/$thirdPath/$hash.$ext';
-        thumbUrls.add(thumbUrl);
-      }
-      return thumbUrls;
-    } catch (e) {
-      print('[Hitomi Resolver] 에러: $e');
-      return [];
-    }
+    return (await getImageList(galleryId, useAvif: useAvif)).smallThumbnails ??
+        [];
   }
 }
