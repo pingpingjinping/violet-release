@@ -10,11 +10,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'Work starts without a download page, stays serial and holds the screen until idle',
+    'Work starts without a download page, runs two galleries and holds the screen until idle',
     () async {
       final wake = <bool>[];
       final first = Completer<void>();
-      final started = Completer<void>();
+      final second = Completer<void>();
+      final firstStarted = Completer<void>();
+      final secondStarted = Completer<void>();
+      final thirdStarted = Completer<void>();
       final order = <int>[];
       final queue = DownloadWorkQueue(
         keepAwake: (value) async {
@@ -23,7 +26,7 @@ void main() {
       );
       final a = queue.submit(1, () async {
         order.add(1);
-        started.complete();
+        firstStarted.complete();
         await first.future;
       });
       final duplicate = queue.submit(1, () async {
@@ -31,17 +34,29 @@ void main() {
       });
       final b = queue.submit(2, () async {
         order.add(2);
+        secondStarted.complete();
+        await second.future;
       });
+      final c = queue.submit(3, () async {
+        order.add(3);
+        thirdStarted.complete();
+      });
+
       expect(duplicate, same(a));
-      await started.future;
-      expect(order, [1]);
-      expect(queue.activeId, 1);
+      await Future.wait([firstStarted.future, secondStarted.future]);
+      expect(order, [1, 2]);
+      expect(queue.activeIds, {1, 2});
       expect(queue.pendingCount, 1);
       expect(wake, [true]);
+
       first.complete();
-      await Future.wait([a, b]);
+      await thirdStarted.future;
+      expect(order, [1, 2, 3]);
+      expect(queue.activeIds.contains(2), true);
+
+      second.complete();
+      await Future.wait([a, b, c]);
       await Future<void>.delayed(Duration.zero);
-      expect(order, [1, 2]);
       expect(queue.totalCount, 0);
       expect(wake, [true, false]);
       queue.dispose();
@@ -122,27 +137,36 @@ void main() {
   });
 
   test(
-    'Removing pending work completes immediately without waiting for the active gallery',
+    'Removing pending work completes immediately without waiting for active galleries',
     () async {
       final first = Completer<void>();
-      final started = Completer<void>();
+      final second = Completer<void>();
+      final firstStarted = Completer<void>();
+      final secondStarted = Completer<void>();
       var removedRan = false;
       final queue = DownloadWorkQueue(keepAwake: (_) async {});
-      final active = queue.submit(1, () async {
-        started.complete();
+      final activeA = queue.submit(1, () async {
+        firstStarted.complete();
         await first.future;
       });
-      final pending = queue.submit(2, () async {
+      final activeB = queue.submit(2, () async {
+        secondStarted.complete();
+        await second.future;
+      });
+      final pending = queue.submit(3, () async {
         removedRan = true;
       });
-      await started.future;
-      expect(queue.cancelPending(2), true);
+
+      await Future.wait([firstStarted.future, secondStarted.future]);
+      expect(queue.cancelPending(3), true);
       await pending;
       expect(removedRan, false);
-      expect(queue.contains(2), false);
-      expect(queue.activeId, 1);
+      expect(queue.contains(3), false);
+      expect(queue.activeIds, {1, 2});
+
       first.complete();
-      await active;
+      second.complete();
+      await Future.wait([activeA, activeB]);
       await Future<void>.delayed(Duration.zero);
       queue.dispose();
     },
