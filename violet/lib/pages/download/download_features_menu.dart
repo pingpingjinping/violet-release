@@ -27,7 +27,7 @@ class DownloadFeaturesMenu extends StatelessWidget {
                     _typeItem(
                       context,
                       Icons.filter_list,
-                      '필터링',
+                      'Incomplete',
                       3,
                     ),
                     _typeItem(
@@ -42,7 +42,7 @@ class DownloadFeaturesMenu extends StatelessWidget {
                       'Retry Stopped Item',
                       0,
                     ),
-                    _typeItem(context, MdiIcons.rotateLeft, 'All Recovery', 1),
+                    _typeItem(context, MdiIcons.rotateLeft, 'Recovery All', 1),
                   ],
                 ),
               ),
