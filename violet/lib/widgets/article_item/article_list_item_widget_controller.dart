@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'package:intl/intl.dart';
+import 'package:violet/log/log.dart';
 import 'package:violet/database/user/bookmark.dart';
 import 'package:violet/database/user/record.dart';
 import 'package:violet/model/article_list_item.dart';
@@ -121,12 +122,40 @@ class ArticleListItemWidgetController extends GetxController {
         : '';
   }
 
-  setProvider() async {
-    final provider = await getImageProvider(articleListItem.queryResult);
+  setProvider([int attempt = 0]) async {
+    try {
+      final provider = await getImageProvider(articleListItem.queryResult);
+      final count = provider.length();
+      if (count <= 0) {
+        throw StateError(
+          'Image provider returned 0 pages for ${articleListItem.queryResult.id()}',
+        );
+      }
 
-    thumbnail.value = await provider.getThumbnailUrl();
-    headers.value = await provider.getHeader(0);
-    imageCount.value = provider.length();
+      final nextThumbnail = await provider.getThumbnailUrl();
+      final nextHeaders = await provider.getHeader(0);
+      if (disposed) return;
+
+      thumbnail.value = nextThumbnail;
+      headers.value = nextHeaders;
+      imageCount.value = count;
+    } catch (e, st) {
+      Logger.warning(
+        '[article-list-setProvider] id=${articleListItem.queryResult.id()} '
+        'attempt=${attempt + 1} E: $e\n$st',
+      );
+
+      // Recover from one transient provider/network failure without creating
+      // an endless retry loop or request storm.
+      if (!disposed && attempt == 0) {
+        Future.delayed(
+          const Duration(seconds: 1),
+          () {
+            if (!disposed) setProvider(1);
+          },
+        );
+      }
+    }
   }
 
   String _firstPipeValue(String? value) {
