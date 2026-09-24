@@ -101,7 +101,7 @@ class IsolateDownloaderErrorUnit {
 
 int _taskCurrentCount = 0;
 int _maxTaskCount = 0;
-const int _maxRetryCount = 100;
+late int _maxRetryCount;
 late SendPort _sendPort;
 late Queue<IsolateDownloaderTask> _dqueue;
 late Map<int, IsolateDownloaderTask> _workingMap;
@@ -112,6 +112,8 @@ Future<void> _processTask(IsolateDownloaderTask task) async {
   var options = BaseOptions(
     contentType: Headers.formUrlEncodedContentType,
     validateStatus: (status) => true,
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 30),
   );
   var dio = Dio(options);
 
@@ -128,11 +130,38 @@ Future<void> _processTask(IsolateDownloaderTask task) async {
 
   try {
     var retryCount = 0;
-    var tooManyRetry = true;
+    var finished = false;
 
-    do {
+    Future<bool> scheduleRetry({
+      required int code,
+      String? reason,
+    }) async {
+      if (retryCount >= _maxRetryCount) {
+        return false;
+      }
+
+      retryCount++;
+      _sendPort.send(
+        ReceivePortData(
+          type: ReceivePortType.retry,
+          data: {
+            'id': task.id,
+            'url': task.url,
+            'count': retryCount,
+            'code': code,
+            if (reason != null) 'reason': reason,
+          },
+        ),
+      );
+
+      // Back off a little so a stalled endpoint is not hammered repeatedly.
+      await Future.delayed(const Duration(milliseconds: 500));
+      return true;
+    }
+
+    while (!finished) {
       try {
-        var res = await dio.download(
+        final res = await dio.download(
           task.url,
           task.fullpath,
           cancelToken: task.cancelToken,
@@ -151,69 +180,76 @@ Future<void> _processTask(IsolateDownloaderTask task) async {
           },
         );
 
-        // check download not available
-        if (res.statusCode != 503) {
-          // check 404 or anythings
-          if (res.statusCode != 200) {
-            tooManyRetry = false;
+        if (res.statusCode == 200) {
+          final file = File(task.fullpath);
+          if (await file.exists() && await file.length() != 0) {
             _sendPort.send(
-              ReceivePortData(
-                type: ReceivePortType.error,
-                data: IsolateDownloaderErrorUnit(
-                  id: task.id,
-                  error: 'Code ${res.statusCode}',
-                  stackTrace: '',
-                ),
-              ),
+              ReceivePortData(type: ReceivePortType.complete, data: task.id),
             );
+            finished = true;
             break;
           }
-
-          // check download file is not empty
-          var file = File(task.fullpath);
           if (await file.exists()) {
-            if (await file.length() != 0) {
-              tooManyRetry = false;
-              _sendPort.send(
-                ReceivePortData(type: ReceivePortType.complete, data: task.id),
-              );
-              break;
-            }
             await file.delete();
           }
+
+          if (!await scheduleRetry(code: 200, reason: 'empty_file')) {
+            break;
+          }
+          continue;
+        }
+
+        // 503 is normally temporary, so retry it just like a network stall.
+        if (res.statusCode == 503) {
+          if (!await scheduleRetry(
+            code: 503,
+            reason: 'service_unavailable',
+          )) {
+            break;
+          }
+          continue;
         }
 
         _sendPort.send(
           ReceivePortData(
-            type: ReceivePortType.retry,
-            data: {
-              'id': task.id,
-              'url': task.url,
-              'count': retryCount,
-              'code': res.statusCode,
-            },
+            type: ReceivePortType.error,
+            data: IsolateDownloaderErrorUnit(
+              id: task.id,
+              error: 'Code ${res.statusCode}',
+              stackTrace: '',
+            ),
           ),
         );
+        finished = true;
+      } on DioException catch (e) {
+        if (CancelToken.isCancel(e)) {
+          finished = true;
+          break;
+        }
 
-        retryCount++;
+        final retryable =
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionError;
 
-        await Future.delayed(const Duration(milliseconds: 100));
-      } catch (e) {
-        if (!(e is DioException &&
-            e.type == DioExceptionType.connectionError &&
-            e.message!.contains('Connection reset by peer'))) {
+        if (!retryable) {
           rethrow;
         }
-      }
-    } while (retryCount < _maxRetryCount);
 
-    if (tooManyRetry) {
+        if (!await scheduleRetry(code: -1, reason: e.type.name)) {
+          break;
+        }
+      }
+    }
+
+    if (!finished) {
       _sendPort.send(
         ReceivePortData(
           type: ReceivePortType.error,
           data: IsolateDownloaderErrorUnit(
             id: task.id,
-            error: 'Too many retry',
+            error: 'Too many retries ($_maxRetryCount)',
             stackTrace: '',
           ),
         ),
@@ -257,6 +293,7 @@ void _initIsolateDownloader(IsolateDownloaderOption option) {
   _dqueue = Queue<IsolateDownloaderTask>();
   _workingMap = <int, IsolateDownloaderTask>{};
   _maxTaskCount = option.threadCount;
+  _maxRetryCount = option.maxRetryCount.clamp(1, 100).toInt();
 }
 
 void _cancelTask(int taskId) {
