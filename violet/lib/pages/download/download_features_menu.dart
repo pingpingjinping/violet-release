@@ -7,7 +7,12 @@ import 'package:violet/settings/settings.dart';
 import 'package:violet/style/palette.dart';
 
 class DownloadFeaturesMenu extends StatelessWidget {
-  const DownloadFeaturesMenu({super.key});
+  const DownloadFeaturesMenu({
+    super.key,
+    this.incompleteActive = false,
+  });
+
+  final bool incompleteActive;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +34,7 @@ class DownloadFeaturesMenu extends StatelessWidget {
                       Icons.filter_list,
                       'Incomplete',
                       3,
+                      selected: incompleteActive,
                     ),
                     _typeItem(
                       context,
@@ -57,22 +63,29 @@ class DownloadFeaturesMenu extends StatelessWidget {
     BuildContext context,
     IconData icon,
     String text,
-    int selection,
-  ) {
+    int selection, {
+    bool selected = false,
+  }) {
+    final normalColor = Settings.themeWhat.value
+        ? Colors.grey.shade200
+        : Colors.grey.shade900;
+    final selectedBackground = Settings.themeWhat.value
+        ? Colors.white.withOpacity(0.14)
+        : Colors.black.withOpacity(0.10);
+
     return ListTile(
+      selected: selected,
+      selectedTileColor: selectedBackground,
       leading: Icon(
         icon,
-        color: Settings.themeWhat.value
-            ? Colors.grey.shade200
-            : Colors.grey.shade900,
+        color: selected ? Settings.majorColor.value : normalColor,
       ),
       title: Text(
         text,
         softWrap: false,
         style: TextStyle(
-          color: Settings.themeWhat.value
-              ? Colors.grey.shade200
-              : Colors.grey.shade900,
+          color: selected ? Settings.majorColor.value : normalColor,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
       onTap: () async {
