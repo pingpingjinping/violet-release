@@ -208,7 +208,7 @@ class _FilterPageState extends State<FilterPage> {
           const Text('상태'),
           FilterChip(
             avatar: const Icon(Icons.pause_circle_outline, size: 18),
-            label: Text('중지됨 (${c.stoppedCount})'),
+            label: Text('Incomplete (${c.stoppedCount})'),
             selected: c.stoppedOnly,
             onSelected: (value) {
               setState(() {
