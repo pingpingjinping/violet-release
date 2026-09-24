@@ -9,11 +9,17 @@ class FilterController {
   var isSearch = false;
   var isPopulationSort = false;
   String heroKey;
+  final bool showStoppedFilter;
+  bool stoppedOnly = false;
+  int stoppedCount = 0;
 
   var tagStates = <String, bool>{};
   var groupStates = <String, bool>{};
 
-  FilterController({this.heroKey = 'searchtype'});
+  FilterController({
+    this.heroKey = 'searchtype',
+    this.showStoppedFilter = false,
+  });
 
   List<QueryResult> applyFilter(List<QueryResult> queryResult) {
     final result = <QueryResult>[];

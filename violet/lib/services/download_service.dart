@@ -31,6 +31,8 @@ class DownloadService {
   static const _screen = MethodChannel('xyz.project.violet/downloadScreen');
   final changes = ValueNotifier<int>(0);
   final completed = ValueNotifier<DownloadItemModel?>(null);
+  final stopped = ValueNotifier<DownloadItemModel?>(null);
+  final failed = ValueNotifier<DownloadItemModel?>(null);
   final Map<int, GalleryDownloadProgress> _jobs = {};
   Future<void>? _initializing;
   final _submission = Lock();
@@ -216,6 +218,16 @@ class DownloadService {
       job.routine = null;
       job.bytesPerSecond = 0;
       job.changed();
+
+      if (!job.cancelled) {
+        final state = job.item.state();
+        if (state == 6) {
+          stopped.value = job.item;
+        } else if (state == 5) {
+          failed.value = job.item;
+        }
+      }
+
       changes.value++;
     }
   }

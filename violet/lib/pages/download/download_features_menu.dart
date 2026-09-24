@@ -26,6 +26,12 @@ class DownloadFeaturesMenu extends StatelessWidget {
                   children: <Widget>[
                     _typeItem(
                       context,
+                      Icons.filter_list,
+                      '필터링',
+                      3,
+                    ),
+                    _typeItem(
+                      context,
                       MdiIcons.contentCopy,
                       'Copy All URL(or Id)',
                       2,

@@ -84,6 +84,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   Map<int, QueryResult> queryResults = <int, QueryResult>{};
   final FilterController _filterController = FilterController(
     heroKey: 'downloadtype',
+    showStoppedFilter: true,
   );
   ObjectKey _listKey = ObjectKey(const Uuid().v4());
   bool checkMode = false;
@@ -223,6 +224,57 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     if (missing.isNotEmpty) {
       unawaited(_loadMissingQueryResults(missing, revision));
     }
+  }
+
+  Future<void> _prepareDownloadFilterMetadata() async {
+    final stoppedItems = items.where((item) => item.state() == 6).toList();
+    _filterController.stoppedCount = stoppedItems.length;
+
+    final articles = stoppedItems
+        .where((item) => int.tryParse(item.url()) != null)
+        .map((item) => int.parse(item.url()))
+        .where((id) => !queryResults.containsKey(id))
+        .toSet()
+        .toList();
+    if (articles.isEmpty) return;
+
+    final revision = ++_queryRevision;
+    final value = await QueryManager.query(
+      'SELECT * FROM HitomiColumnModel WHERE Id IN (${articles.join(',')})',
+    );
+    if (!mounted || revision != _queryRevision) return;
+
+    for (final element in value.results ?? <QueryResult>[]) {
+      queryResults[element.id()] = element;
+    }
+
+    final missing = articles
+        .where((id) => !queryResults.containsKey(id))
+        .toList();
+    if (missing.isNotEmpty) {
+      await _loadMissingQueryResults(missing, revision);
+    }
+  }
+
+  Future<void> _openDownloadFilter() async {
+    await _prepareDownloadFilterMetadata();
+    if (!mounted) return;
+
+    await PlatformNavigator.navigateFade(
+      context,
+      Provider<FilterController>.value(
+        value: _filterController,
+        child: FilterPage(
+          queryResult: queryResults.entries.map((e) => e.value).toList(),
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _getDownloadWidgetKey().forEach((key, value) {
+      value.currentState?.thubmanilReload();
+    });
+    await _applyFilter();
   }
 
   Future<void> _loadMissingQueryResults(
@@ -1158,6 +1210,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
             );
 
             showToast(level: ToastLevel.check, message: 'Ids Copied!');
+          } else if (value == 3) {
+            await _openDownloadFilter();
           }
         });
   }
@@ -1267,32 +1321,29 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   }
 
   Future<void> _alignLongPress() async {
-    PlatformNavigator.navigateFade(
-      context,
-      Provider<FilterController>.value(
-        value: _filterController,
-        child: FilterPage(
-          queryResult: queryResults.entries.map((e) => e.value).toList(),
-        ),
-      ),
-    ).then((value) {
-      _getDownloadWidgetKey().forEach((key, value) {
-        value.currentState?.thubmanilReload();
-      });
-      _applyFilter();
-    });
+    await _openDownloadFilter();
   }
 
   Future<void> _applyFilter() async {
     var downloading = <int>[];
     var result = <int>[];
     var isOr = _filterController.isOr;
+    final hasTagFilter = _filterController.tagStates.values.any(
+      (selected) => selected,
+    );
+
     for (var element in itemsMap.entries) {
+      if (_filterController.stoppedOnly && element.value.state() != 6) {
+        continue;
+      }
+
       // 1: Pending
       // 2: Extracting
       // 3: Downloading
       // 4: Post Processing
-      if (1 <= element.value.state() && element.value.state() <= 4) {
+      if (!_filterController.stoppedOnly &&
+          1 <= element.value.state() &&
+          element.value.state() <= 4) {
         downloading.add(element.key);
         continue;
       }
@@ -1337,8 +1388,10 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       if (succ) result.add(element.key);
     }
 
-    if (_filterController.tagStates.isNotEmpty) {
+    if (hasTagFilter) {
       filterResult = result.map((e) => itemsMap[e]!).toList();
+    } else if (_filterController.stoppedOnly) {
+      filterResult = items.where((item) => item.state() == 6).toList();
     } else {
       filterResult = items.toList();
     }
@@ -1431,7 +1484,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       filterResult = filterResult.reversed.toList();
     }
 
-    if (_filterController.tagStates.isNotEmpty && downloading.isNotEmpty) {
+    if (hasTagFilter &&
+        !_filterController.stoppedOnly &&
+        downloading.isNotEmpty) {
       filterResult.addAll(downloading.map((e) => itemsMap[e]!).toList());
     }
 

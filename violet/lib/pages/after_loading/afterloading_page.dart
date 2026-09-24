@@ -65,6 +65,8 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     unawaited(BookmarkSync.automatic());
     FToast().init(context);
     DownloadService.instance.completed.addListener(_downloadCompleted);
+    DownloadService.instance.stopped.addListener(_downloadStopped);
+    DownloadService.instance.failed.addListener(_downloadFailed);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(
         DownloadService.instance.initialize().catchError((Object error) {
@@ -102,6 +104,26 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     );
   }
 
+  void _downloadStopped() {
+    final item = DownloadService.instance.stopped.value;
+    if (!mounted || item == null) return;
+    showToast(
+      icon: Icons.pause_circle_outline,
+      level: ToastLevel.warning,
+      message: '${item.url()} 다운로드가 중지되었습니다',
+    );
+  }
+
+  void _downloadFailed() {
+    final item = DownloadService.instance.failed.value;
+    if (!mounted || item == null) return;
+    showToast(
+      icon: Icons.error_outline,
+      level: ToastLevel.error,
+      message: '${item.url()} 다운로드에 실패했습니다',
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -110,6 +132,8 @@ class AfterLoadingPageState extends State<AfterLoadingPage>
     nestedFocusNode.dispose();
     _activeTab.dispose();
     DownloadService.instance.completed.removeListener(_downloadCompleted);
+    DownloadService.instance.stopped.removeListener(_downloadStopped);
+    DownloadService.instance.failed.removeListener(_downloadFailed);
     _deeplinkSubscription?.cancel();
     _shareSubscription?.cancel();
     super.dispose();

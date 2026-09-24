@@ -132,6 +132,7 @@ class _FilterPageState extends State<FilterPage> {
             c.isSearch
                 ? _buildSearchControlPanel()
                 : _buildSelectControlPanel(),
+            if (c.showStoppedFilter) _buildDownloadStatePanel(),
             _buildOptionButtons(),
           ],
         ),
@@ -195,6 +196,30 @@ class _FilterPageState extends State<FilterPage> {
       ),
     );
   }*/
+
+  Widget _buildDownloadStatePanel() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4.0),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8.0,
+        children: [
+          const Text('상태'),
+          FilterChip(
+            avatar: const Icon(Icons.pause_circle_outline, size: 18),
+            label: Text('중지됨 (${c.stoppedCount})'),
+            selected: c.stoppedOnly,
+            onSelected: (value) {
+              setState(() {
+                c.stoppedOnly = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   _buildOptionButtons() {
     return Wrap(
