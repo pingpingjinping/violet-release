@@ -64,6 +64,7 @@ import 'package:violet/pages/settings/version_page.dart';
 import 'package:violet/pages/splash/splash_page.dart';
 import 'package:violet/platform/misc.dart';
 import 'package:violet/settings/settings.dart';
+import 'package:violet/services/content_db_sync.dart';
 import 'package:violet/style/palette.dart';
 import 'package:violet/util/helper.dart';
 import 'package:violet/version/sync.dart';
@@ -2433,6 +2434,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
             if (dialog == null) return;
 
             final prefs = await SharedPreferences.getInstance();
+            var cookieChanged = false;
             if (dialog == 1) {
               var cookie = await Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -2453,6 +2455,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
                 });
 
                 await prefs.setString('eh_cookies', cookie);
+                cookieChanged = true;
               }
 
               if (cookie != null) {
@@ -2537,6 +2540,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
                 final cookie =
                     'sk=${sController.text};ipb_member_id=${imiController.text};ipb_pass_hash=${iphController.text};igneous=${iController.text}';
                 await prefs.setString('eh_cookies', cookie);
+                cookieChanged = true;
               }
             }
             final cookie = prefs.getString('eh_cookies') ?? '';
@@ -2563,6 +2567,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
               useExHentai = true;
             }
             if (useExHentai) {
+              if (cookieChanged) {
+                await ContentDbSync.pushEhCookieToPi(force: true);
+              }
               Settings.searchRule = 'Hitomi|ExHentai|EHentai|NHentai'.split(
                 '|',
               );
