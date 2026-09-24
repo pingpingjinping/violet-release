@@ -21,12 +21,16 @@ class ExHentaiAuthStatus {
   final String status;
   final String? reason;
   final DateTime? checkedAt;
+  final bool? configured;
+  final String? source;
 
   const ExHentaiAuthStatus({
     required this.available,
     required this.status,
     this.reason,
     this.checkedAt,
+    this.configured,
+    this.source,
   });
 
   bool get needsLogin => status == 'invalid';
@@ -38,6 +42,8 @@ class ExHentaiAuthStatus {
       status: json['status'] is String ? json['status'] as String : 'unknown',
       reason: json['reason'] is String ? json['reason'] as String : null,
       checkedAt: rawCheckedAt is String ? DateTime.tryParse(rawCheckedAt) : null,
+      configured: json['configured'] is bool ? json['configured'] as bool : null,
+      source: json['source'] is String ? json['source'] as String : null,
     );
   }
 }
@@ -131,7 +137,7 @@ class ContentDbSync {
 
     final client = http.Client();
     try {
-      final uri = Uri.parse(
+      final cookieUri = Uri.parse(
         ServerConfig.endpoint(
           context.apiBase,
           'api/settings/exhentai-cookie',
@@ -139,8 +145,14 @@ class ContentDbSync {
       );
 
       if (!force) {
+        final authUri = Uri.parse(
+          ServerConfig.endpoint(
+            context.apiBase,
+            'api/settings/exhentai-auth-status',
+          ),
+        );
         final statusResponse = await client
-            .get(uri)
+            .get(authUri)
             .timeout(const Duration(seconds: 5));
         if (statusResponse.statusCode != 200) {
           // Older/unreachable servers must never cause a blind overwrite.
@@ -149,12 +161,16 @@ class ContentDbSync {
 
         final decoded = jsonDecode(statusResponse.body);
         if (decoded is! Map<String, dynamic>) return false;
-        if (decoded['configured'] == true) return true;
+        final status = ExHentaiAuthStatus.fromJson(decoded);
+
+        // Only an explicit "configured: false" is allowed to bootstrap from
+        // the app. Missing/old API fields are treated conservatively.
+        if (status.configured != false) return true;
       }
 
       final response = await client
           .put(
-            uri,
+            cookieUri,
             headers: {
               'Content-Type': 'application/json',
               'X-Violet-Sync-Token': context.syncToken,
