@@ -15,10 +15,38 @@ import 'package:violet/database/database.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/version/sync.dart';
 
+
+class ExHentaiAuthStatus {
+  final bool available;
+  final String status;
+  final String? reason;
+  final DateTime? checkedAt;
+
+  const ExHentaiAuthStatus({
+    required this.available,
+    required this.status,
+    this.reason,
+    this.checkedAt,
+  });
+
+  bool get needsLogin => status == 'invalid';
+
+  factory ExHentaiAuthStatus.fromJson(Map<String, dynamic> json) {
+    final rawCheckedAt = json['checkedAt'];
+    return ExHentaiAuthStatus(
+      available: json['available'] == true,
+      status: json['status'] is String ? json['status'] as String : 'unknown',
+      reason: json['reason'] is String ? json['reason'] as String : null,
+      checkedAt: rawCheckedAt is String ? DateTime.tryParse(rawCheckedAt) : null,
+    );
+  }
+}
+
 /// Complete Korean snapshots have their own version, separate from bookmarks
 /// and incremental chunk synchronization. User databases are never replaced.
 class ContentDbSync {
   static const lastSuccessfulSyncKey = 'content-snapshot-synced-at';
+  static const _ehCookieSyncPendingKey = 'eh-cookie-sync-pending';
 
   static Future<bool>? _inFlight;
   static bool _checkedThisSession = false;
@@ -31,9 +59,18 @@ class ContentDbSync {
     _checkedThisSession = true;
     final prefs = await SharedPreferences.getInstance();
 
-    // Keep Pi's ExHentai cookie in sync with the cookie captured by the app.
-    // Do not block the content DB check/download if the Pi is unreachable.
-    unawaited(_syncEhCookieToPi(prefs));
+    // Bootstrap Pi's ExHentai cookie only when the server has none.
+    // A cookie explicitly refreshed by the user is retried until it reaches Pi.
+    // Ordinary app launches never overwrite an existing Pi cookie.
+    final pendingEhCookieSync =
+        prefs.getBool(_ehCookieSyncPendingKey) ?? false;
+    unawaited(
+      _syncEhCookieToPi(
+        prefs,
+        force: pendingEhCookieSync,
+        markPendingOnFailure: pendingEhCookieSync,
+      ),
+    );
 
     if (!(prefs.getBool('auto_content_db_update') ?? true)) return false;
     return _inFlight ??= _exchange(canApply, onProgress).whenComplete(() {
@@ -41,33 +78,86 @@ class ContentDbSync {
     });
   }
 
-  static Future<void> _syncEhCookieToPi(SharedPreferences prefs) async {
-    final cookie = prefs.getString('eh_cookies')?.trim();
-    if (cookie == null || cookie.isEmpty) return;
+  static Future<bool> pushEhCookieToPi({bool force = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (force) {
+      await prefs.setBool(_ehCookieSyncPendingKey, true);
+    }
+    return _syncEhCookieToPi(
+      prefs,
+      force: force,
+      markPendingOnFailure: force,
+    );
+  }
 
-    final syncToken = prefs.getString('bookmark_sync_token')?.trim() ?? '';
-    final syncBase = prefs.getString('bookmark_sync_server')?.trim() ?? '';
-    if (syncToken.isEmpty || syncBase.isEmpty) return;
+  static Future<ExHentaiAuthStatus?> fetchExHentaiAuthStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final context = _resolvePiContext(prefs);
+    if (context == null) return null;
 
     final client = http.Client();
     try {
-      final base = ServerConfig.apiBase(ServerConfig.webBase);
-      final baseUri = Uri.parse(base);
-      if (!_isLocalOrPrivateHost(baseUri.host)) return;
-
-      final syncUri = Uri.parse(ServerConfig.normalize(syncBase));
-      if (syncUri.host != baseUri.host) return;
-
       final uri = Uri.parse(
-        ServerConfig.endpoint(base, 'api/settings/exhentai-cookie'),
+        ServerConfig.endpoint(
+          context.apiBase,
+          'api/settings/exhentai-auth-status',
+        ),
       );
+      final response = await client
+          .get(uri)
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return null;
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return null;
+      return ExHentaiAuthStatus.fromJson(decoded);
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
+  static Future<bool> _syncEhCookieToPi(
+    SharedPreferences prefs, {
+    required bool force,
+    required bool markPendingOnFailure,
+  }) async {
+    final cookie = prefs.getString('eh_cookies')?.trim();
+    if (cookie == null || cookie.isEmpty) return false;
+
+    final context = _resolvePiContext(prefs);
+    if (context == null) return false;
+
+    final client = http.Client();
+    try {
+      final uri = Uri.parse(
+        ServerConfig.endpoint(
+          context.apiBase,
+          'api/settings/exhentai-cookie',
+        ),
+      );
+
+      if (!force) {
+        final statusResponse = await client
+            .get(uri)
+            .timeout(const Duration(seconds: 5));
+        if (statusResponse.statusCode != 200) {
+          // Older/unreachable servers must never cause a blind overwrite.
+          return false;
+        }
+
+        final decoded = jsonDecode(statusResponse.body);
+        if (decoded is! Map<String, dynamic>) return false;
+        if (decoded['configured'] == true) return true;
+      }
 
       final response = await client
           .put(
             uri,
             headers: {
               'Content-Type': 'application/json',
-              'X-Violet-Sync-Token': syncToken,
+              'X-Violet-Sync-Token': context.syncToken,
             },
             body: jsonEncode({'cookie': cookie}),
           )
@@ -78,14 +168,40 @@ class ContentDbSync {
           '[ContentDbSync] ExHentai cookie sync failed: '
           'HTTP ${response.statusCode}',
         );
+        if (markPendingOnFailure) {
+          await prefs.setBool(_ehCookieSyncPendingKey, true);
+        }
+        return false;
       }
+
+      await prefs.remove(_ehCookieSyncPendingKey);
+      return true;
     } catch (_) {
+      if (markPendingOnFailure) {
+        await prefs.setBool(_ehCookieSyncPendingKey, true);
+      }
       // Cookie sync is best-effort. A Pi/network failure must not delay or
       // prevent the normal startup DB synchronization.
       Logger.error('[ContentDbSync] ExHentai cookie sync failed');
+      return false;
     } finally {
       client.close();
     }
+  }
+
+  static _PiCookieSyncContext? _resolvePiContext(SharedPreferences prefs) {
+    final syncToken = prefs.getString('bookmark_sync_token')?.trim() ?? '';
+    final syncBase = prefs.getString('bookmark_sync_server')?.trim() ?? '';
+    if (syncToken.isEmpty || syncBase.isEmpty) return null;
+
+    final base = ServerConfig.apiBase(ServerConfig.webBase);
+    final baseUri = Uri.tryParse(base);
+    if (baseUri == null || !_isLocalOrPrivateHost(baseUri.host)) return null;
+
+    final syncUri = Uri.tryParse(ServerConfig.normalize(syncBase));
+    if (syncUri == null || syncUri.host != baseUri.host) return null;
+
+    return _PiCookieSyncContext(apiBase: base, syncToken: syncToken);
   }
 
   static bool _isLocalOrPrivateHost(String host) {
@@ -279,4 +395,14 @@ class ContentDbSync {
       }
     }
   }
+}
+
+class _PiCookieSyncContext {
+  final String apiBase;
+  final String syncToken;
+
+  const _PiCookieSyncContext({
+    required this.apiBase,
+    required this.syncToken,
+  });
 }
