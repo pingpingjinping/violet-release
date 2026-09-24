@@ -107,7 +107,17 @@ class HitomiImageProvider extends VioletImageProvider {
 
   @override
   Future<void> refresh() async {
-    imageList = await HitomiManager.getImageList(id);
+    final next = await HitomiManager.getImageList(id);
+    if (next.urls.isEmpty || next.bigThumbnails.isEmpty) {
+      throw StateError('Hitomi image list refresh returned empty for $id');
+    }
+
+    // Replace the cached list only after a complete refresh succeeds.
+    // Otherwise a transient network failure would leave this provider at
+    // 0 pages until the whole app is restarted.
+    imageList = next;
+    _heightCache = null;
+    _estimatedCache = null;
   }
 
   @override
@@ -118,6 +128,13 @@ class HitomiImageProvider extends VioletImageProvider {
     }
 
     final turls = await HitomiManager.getImageList(id);
+    if (turls.urls.isEmpty || turls.bigThumbnails.isEmpty) {
+      throw StateError('Hitomi partial refresh returned empty for $id');
+    }
+    if (turls.urls.length != imageList.urls.length) {
+      await refresh();
+      return;
+    }
 
     for (var i = 0; i < turls.urls.length; i++) {
       if (target[i]) imageList.urls[i] = turls.urls[i];
