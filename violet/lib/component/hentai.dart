@@ -413,7 +413,7 @@ class HentaiManager {
               final imgList = await HitomiManager.getImageList(
                 qr.id().toString(),
               );
-              if (imgList.bigThumbnails.isEmpty ||
+              if (imgList.urls.isEmpty ||
                   imgList.bigThumbnails.isEmpty) {
                 break;
               }
