@@ -261,10 +261,19 @@ class IsolateDownloader {
     var url = data['url'] as String;
     var count = data['count'] as int;
     var code = data['code'] as int;
+    var reason = data['reason'] as String?;
+
+    // A retry starts the file from byte 0. Reset progress accounting so the
+    // next attempt cannot report a negative byte delta or stale speed.
+    _tasks[id]!.accDownloadSize = 0;
+    _tasks[id]!.isSizeEnsued = false;
+    _taskCountSizes.remove(id);
+    _taskTotalSizes.remove(id);
 
     await Logger.warning(
       '[downloader-retry] URL: $url\n'
       'CODE: $code\n'
+      'REASON: ${reason ?? '-'}\n'
       'P: ${_tasks[id]!.downloadPath!}\n'
       'C: $count',
     );
