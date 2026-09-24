@@ -73,24 +73,26 @@ class DownloadFeaturesMenu extends StatelessWidget {
         ? Colors.white.withOpacity(0.14)
         : Colors.black.withOpacity(0.10);
 
-    return ListTile(
-      selected: selected,
-      selectedTileColor: selectedBackground,
-      leading: Icon(
-        icon,
-        color: selected ? Settings.majorColor.value : normalColor,
-      ),
-      title: Text(
-        text,
-        softWrap: false,
-        style: TextStyle(
-          color: selected ? Settings.majorColor.value : normalColor,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      color: selected ? selectedBackground : Colors.transparent,
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: normalColor,
         ),
+        title: Text(
+          text,
+          softWrap: false,
+          style: TextStyle(
+            color: normalColor,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        onTap: () async {
+          Navigator.pop(context, selection);
+        },
       ),
-      onTap: () async {
-        Navigator.pop(context, selection);
-      },
     );
   }
 }
