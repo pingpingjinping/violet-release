@@ -227,7 +227,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   }
 
   Future<void> _prepareDownloadFilterMetadata() async {
-    final stoppedItems = items.where((item) => item.state() == 6).toList();
+    final stoppedItems = items
+        .where((item) => item.state() == 5 || item.state() == 6)
+        .toList();
     _filterController.stoppedCount = stoppedItems.length;
 
     final articles = stoppedItems
@@ -1333,7 +1335,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     );
 
     for (var element in itemsMap.entries) {
-      if (_filterController.stoppedOnly && element.value.state() != 6) {
+      if (_filterController.stoppedOnly &&
+          element.value.state() != 5 &&
+          element.value.state() != 6) {
         continue;
       }
 
@@ -1391,7 +1395,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     if (hasTagFilter) {
       filterResult = result.map((e) => itemsMap[e]!).toList();
     } else if (_filterController.stoppedOnly) {
-      filterResult = items.where((item) => item.state() == 6).toList();
+      filterResult = items
+          .where((item) => item.state() == 5 || item.state() == 6)
+          .toList();
     } else {
       filterResult = items.toList();
     }
