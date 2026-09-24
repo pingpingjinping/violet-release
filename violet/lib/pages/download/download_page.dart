@@ -89,6 +89,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   ObjectKey _listKey = ObjectKey(const Uuid().v4());
   bool checkMode = false;
   bool checkModePre = false;
+  bool _incompleteFilterActive = false;
   final List<int> checked = [];
 
   @override
@@ -271,6 +272,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     );
 
     if (!mounted) return;
+    _incompleteFilterActive = _filterController.stoppedOnly;
     _getDownloadWidgetKey().forEach((key, value) {
       value.currentState?.thubmanilReload();
     });
@@ -1184,7 +1186,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                   return FadeTransition(opacity: animation, child: wi);
                 },
             pageBuilder: (_, __, ___) => DownloadFeaturesMenu(
-              incompleteActive: _filterController.stoppedOnly,
+              incompleteActive: _incompleteFilterActive,
             ),
             barrierColor: Colors.black12,
             barrierDismissible: true,
@@ -1213,8 +1215,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
             showToast(level: ToastLevel.check, message: 'Ids Copied!');
           } else if (value == 3) {
-            _filterController.stoppedOnly = !_filterController.stoppedOnly;
-            if (_filterController.stoppedOnly) {
+            _incompleteFilterActive = !_incompleteFilterActive;
+            _filterController.stoppedOnly = _incompleteFilterActive;
+            if (_incompleteFilterActive) {
               await _prepareDownloadFilterMetadata();
             }
             await _applyFilter();
@@ -1339,7 +1342,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     );
 
     for (var element in itemsMap.entries) {
-      if (_filterController.stoppedOnly && element.value.state() == 0) {
+      if (_incompleteFilterActive && element.value.state() == 0) {
         continue;
       }
 
@@ -1347,7 +1350,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       // 2: Extracting
       // 3: Downloading
       // 4: Post Processing
-      if (!_filterController.stoppedOnly &&
+      if (!_incompleteFilterActive &&
           1 <= element.value.state() &&
           element.value.state() <= 4) {
         downloading.add(element.key);
@@ -1394,7 +1397,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       if (succ) result.add(element.key);
     }
 
-    if (_filterController.stoppedOnly) {
+    if (_incompleteFilterActive) {
       filterResult = items.where((item) => item.state() != 0).toList();
     } else if (hasTagFilter) {
       filterResult = result.map((e) => itemsMap[e]!).toList();
@@ -1491,7 +1494,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     }
 
     if (hasTagFilter &&
-        !_filterController.stoppedOnly &&
+        !_incompleteFilterActive &&
         downloading.isNotEmpty) {
       filterResult.addAll(downloading.map((e) => itemsMap[e]!).toList());
     }
