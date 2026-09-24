@@ -118,6 +118,20 @@ class _SplashPageState extends State<SplashPage> {
     return Timer(duration, navigationPage);
   }
 
+  Future<void> _checkExHentaiAuthStatus() async {
+    final status = await ContentDbSync.fetchExHentaiAuthStatus();
+    if (!mounted || status?.needsLogin != true) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('ExHentai 로그인 갱신 필요'),
+        duration: Duration(seconds: 5),
+      ),
+    );
+  }
+
   Future<void> navigationPage() async {
     setState(() {
       showMessage = true;
@@ -175,6 +189,9 @@ class _SplashPageState extends State<SplashPage> {
 
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getInt('db_exists') == 1 && !widget.switching) {
+      // Check Pi's persisted ExHentai auth result without delaying DB startup.
+      unawaited(_checkExHentaiAuthStatus());
+
       await ContentDbSync.startup(
         canApply: () => mounted,
         onProgress: _updateContentProgress,
