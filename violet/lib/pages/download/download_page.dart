@@ -1213,7 +1213,11 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
             showToast(level: ToastLevel.check, message: 'Ids Copied!');
           } else if (value == 3) {
-            await _openDownloadFilter();
+            _filterController.stoppedOnly = !_filterController.stoppedOnly;
+            if (_filterController.stoppedOnly) {
+              await _prepareDownloadFilterMetadata();
+            }
+            await _applyFilter();
           }
         });
   }
@@ -1392,12 +1396,12 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       if (succ) result.add(element.key);
     }
 
-    if (hasTagFilter) {
-      filterResult = result.map((e) => itemsMap[e]!).toList();
-    } else if (_filterController.stoppedOnly) {
+    if (_filterController.stoppedOnly) {
       filterResult = items
           .where((item) => item.state() == 5 || item.state() == 6)
           .toList();
+    } else if (hasTagFilter) {
+      filterResult = result.map((e) => itemsMap[e]!).toList();
     } else {
       filterResult = items.toList();
     }
