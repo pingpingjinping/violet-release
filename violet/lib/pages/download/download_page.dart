@@ -227,9 +227,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
   }
 
   Future<void> _prepareDownloadFilterMetadata() async {
-    final stoppedItems = items
-        .where((item) => item.state() == 5 || item.state() == 6)
-        .toList();
+    final stoppedItems = items.where((item) => item.state() != 0).toList();
     _filterController.stoppedCount = stoppedItems.length;
 
     final articles = stoppedItems
@@ -1185,7 +1183,9 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                 ) {
                   return FadeTransition(opacity: animation, child: wi);
                 },
-            pageBuilder: (_, __, ___) => const DownloadFeaturesMenu(),
+            pageBuilder: (_, __, ___) => DownloadFeaturesMenu(
+              incompleteActive: _filterController.stoppedOnly,
+            ),
             barrierColor: Colors.black12,
             barrierDismissible: true,
           ),
@@ -1339,9 +1339,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     );
 
     for (var element in itemsMap.entries) {
-      if (_filterController.stoppedOnly &&
-          element.value.state() != 5 &&
-          element.value.state() != 6) {
+      if (_filterController.stoppedOnly && element.value.state() == 0) {
         continue;
       }
 
@@ -1397,9 +1395,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
     }
 
     if (_filterController.stoppedOnly) {
-      filterResult = items
-          .where((item) => item.state() == 5 || item.state() == 6)
-          .toList();
+      filterResult = items.where((item) => item.state() != 0).toList();
     } else if (hasTagFilter) {
       filterResult = result.map((e) => itemsMap[e]!).toList();
     } else {
