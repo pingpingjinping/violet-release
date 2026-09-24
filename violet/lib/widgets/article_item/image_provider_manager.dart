@@ -24,19 +24,24 @@ class ProviderManager {
   }
 
   static Future<VioletImageProvider> get(int id) async {
-    if (_dirty[id]!) {
+    final provider = _ids[id]!;
+    if (_dirty[id] == true) {
+      // Keep the provider dirty until refresh completes successfully.
+      // A transient refresh failure must not turn a cached gallery into a
+      // permanently empty/clean provider for the rest of the app session.
+      await provider.refresh();
       _dirty[id] = false;
-      await _ids[id]!.refresh();
     }
-    return _ids[id]!;
+    return provider;
   }
 
   static bool dirty(int id) {
-    return _dirty[id]!;
+    return _dirty[id] ?? false;
   }
 
   static void clear() {
     _ids.clear();
+    _dirty.clear();
   }
 
   static void checkMustRefresh() {
