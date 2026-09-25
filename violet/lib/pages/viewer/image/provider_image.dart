@@ -50,6 +50,7 @@ class ProviderImage extends StatefulWidget {
 class _ProviderImageState extends State<ProviderImage> {
   late final ViewerController c;
   bool _loaded = false;
+  bool _refreshing = false;
 
   @override
   void initState() {
@@ -104,21 +105,46 @@ class _ProviderImageState extends State<ProviderImage> {
       Logger.error(
         '[viewer-provider_image] URL: ${widget.imgUrl}\nE: ${state.lastException}',
       );
-      state.reLoadImage();
+      _loaded = false;
+      c.isImageLoaded[widget.index] = false;
 
-      final iconButton = IconButton(
-        icon: Icon(Icons.refresh, color: Settings.majorColor.value),
-        onPressed: () => setState(() {
-          c.imgKeys[widget.index] = GlobalKey();
-        }),
-      );
+      if (!_refreshing) {
+        state.reLoadImage();
+      }
+
+      final retryWidget = _refreshing
+          ? const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(),
+            )
+          : IconButton(
+              icon: Icon(Icons.refresh, color: Settings.majorColor.value),
+              onPressed: () async {
+                if (_refreshing) return;
+
+                setState(() {
+                  _refreshing = true;
+                });
+
+                try {
+                  await c.refreshFailedImages();
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _refreshing = false;
+                    });
+                  }
+                }
+              },
+            );
 
       return SizedBox(
         height: c.estimatedImgHeight[widget.index] != 0
             ? c.estimatedImgHeight[widget.index]
             : 300,
         child: Center(
-          child: SizedBox(width: 50, height: 50, child: iconButton),
+          child: SizedBox(width: 50, height: 50, child: retryWidget),
         ),
       );
     }
