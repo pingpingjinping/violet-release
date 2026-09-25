@@ -80,6 +80,7 @@ class ViewerController extends GetxController {
   var onSession = true.obs;
   var isStaring = true;
   var sliderOnChange = false;
+  bool _refreshingFailedImages = false;
 
   /// these are used on overlay
   var overlay = false.obs;
@@ -306,6 +307,77 @@ class ViewerController extends GetxController {
     messageIndex.value = 1;
 
     gotoSearchIndex();
+  }
+
+  Future<void> refreshFailedImages() async {
+    if (_refreshingFailedImages ||
+        !provider.useProvider ||
+        provider.provider == null) {
+      return;
+    }
+
+    final failedPages = <int>[
+      for (var i = 0; i < isImageLoaded.length; i++)
+        if (!isImageLoaded[i] && urlCache[i] != null) i,
+    ];
+    if (failedPages.isEmpty) return;
+
+    _refreshingFailedImages = true;
+    try {
+      if (provider.provider!.isRefreshable()) {
+        try {
+          // Refresh the whole gallery source so a broken/stale URL set is
+          // replaced once, while already loaded pages remain untouched.
+          await provider.provider!.refresh();
+        } catch (e, st) {
+          Logger.warning(
+            '[viewer-refresh-failed-images] Provider refresh failed: $e\n$st',
+          );
+        }
+      }
+
+      for (final index in failedPages) {
+        final oldUrl = urlCache[index]?.value;
+
+        try {
+          final header = await provider.provider!.getHeader(index);
+          final url = await provider.provider!.getImageUrl(index);
+
+          headerCache[index] = header;
+          if (oldUrl != null) {
+            await CachedNetworkImage.evictFromCache(oldUrl);
+          }
+
+          // Only failed pages are rebuilt. Successfully loaded pages keep
+          // their current widget and cache even though the provider refreshed.
+          imgKeys[index] = GlobalKey();
+          if (urlCache[index] == null) {
+            urlCache[index] = RxString(url);
+          } else if (urlCache[index]!.value != url) {
+            urlCache[index]!.value = url;
+          } else {
+            // The source may be unchanged after a transient failure. Force
+            // observers to rebuild so the same URL is genuinely retried.
+            urlCache[index]!.refresh();
+          }
+        } catch (e, st) {
+          Logger.warning(
+            '[viewer-refresh-failed-images] Page $index refresh failed: '
+            '$e\n$st',
+          );
+
+          // Even if resolving a fresh URL failed, retry the existing URL after
+          // evicting its failed cache entry.
+          if (oldUrl != null && urlCache[index] != null) {
+            await CachedNetworkImage.evictFromCache(oldUrl);
+            imgKeys[index] = GlobalKey();
+            urlCache[index]!.refresh();
+          }
+        }
+      }
+    } finally {
+      _refreshingFailedImages = false;
+    }
   }
 
   refreshImgUrlWhenRequired() async {
