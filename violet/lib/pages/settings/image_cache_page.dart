@@ -144,9 +144,15 @@ class _ImageCachePageState extends State<ImageCachePage> {
       PaintingBinding.instance.imageCache.clearLiveImages();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(completedMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.black87,
+          content: Text(
+            completedMessage,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
       await _refresh();
     } catch (error) {
       if (!mounted) return;
