@@ -49,7 +49,7 @@ void main() {
     expect(
       DownloadArchive.fileName(
         '4192094',
-        r'A:B/C\\D*E?F"G<H>I|J',
+        r'A:B/C\D*E?F"G<H>I|J',
       ),
       '4192094 (A_B_C_D_E_F_G_H_I_J).zip',
     );
