@@ -65,6 +65,25 @@ void main() {
     expect(longName, endsWith(').zip'));
   });
 
+  test('archive filename strips emoji for SMB/NAS compatibility', () {
+    expect(
+      DownloadArchive.fileName('3469671', '🦝'),
+      '3469671.zip',
+    );
+    expect(
+      DownloadArchive.fileName('4039448', '♨️🚺🍄'),
+      '4039448.zip',
+    );
+    expect(
+      DownloadArchive.fileName('4192094', '작품 🍄 제목'),
+      '4192094 (작품 제목).zip',
+    );
+    expect(
+      DownloadArchive.fileName('4192095', '普通のタイトル'),
+      '4192095 (普通のタイトル).zip',
+    );
+  });
+
   test('packing failure keeps originals and removes unfinished ZIP', () async {
     final source = await page('a.png', png);
     final zip = '${root.path}/failed.zip';
