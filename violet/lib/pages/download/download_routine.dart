@@ -206,7 +206,11 @@ class DownloadRoutine {
     final workingPath = result['Path'] as String;
     final archiveDirectory = await _downloadArchiveDirectory();
     await Directory(archiveDirectory).create(recursive: true);
-    final archivePath = join(archiveDirectory, '${item.url()}.zip');
+    final archiveName = DownloadArchive.fileName(
+      item.url(),
+      tasks!.first.format?.title,
+    );
+    final archivePath = join(archiveDirectory, archiveName);
     final entries = await DownloadArchive.create(archivePath, originals);
     if (shouldCancel?.call() ?? false) {
       await DownloadArchive.deleteSources(entries);

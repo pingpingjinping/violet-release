@@ -45,6 +45,26 @@ void main() {
     },
   );
 
+  test('archive filename uses id and a Windows-safe title', () {
+    expect(
+      DownloadArchive.fileName(
+        '4192094',
+        r'A:B/C\\D*E?F"G<H>I|J',
+      ),
+      '4192094 (A_B_C_D_E_F_G_H_I_J).zip',
+    );
+    expect(DownloadArchive.fileName('4192094', '   '), '4192094.zip');
+    expect(DownloadArchive.fileName('4192094', null), '4192094.zip');
+
+    final longName = DownloadArchive.fileName(
+      '4192094',
+      List.filled(200, '가').join(),
+    );
+    expect(utf8.encode(longName).length, lessThanOrEqualTo(200));
+    expect(longName, startsWith('4192094 ('));
+    expect(longName, endsWith(').zip'));
+  });
+
   test('packing failure keeps originals and removes unfinished ZIP', () async {
     final source = await page('a.png', png);
     final zip = '${root.path}/failed.zip';
