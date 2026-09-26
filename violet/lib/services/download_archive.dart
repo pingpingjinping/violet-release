@@ -13,10 +13,53 @@ class DownloadArchive {
   static bool isEntry(String source) => source.startsWith('violet-zip:');
 
   static String fileName(String id, String? title) {
-    var sanitized = title
-            ?.trim()
-            .replaceAll(RegExp(r'[:/\\*?"<>|\x00-\x1F]'), '_')
-            .replaceFirst(RegExp(r'[. ]+
+    var sanitized = (title ?? '').trim();
+    if (sanitized.isEmpty) return '$id.zip';
+
+    sanitized = sanitized.replaceAll(RegExp(r'[:/\\*?"<>|]'), '_');
+    sanitized = String.fromCharCodes(
+      sanitized.codeUnits.map((unit) => unit < 32 ? 95 : unit),
+    );
+    sanitized = _trimWindowsTrailingCharacters(sanitized);
+    if (sanitized.isEmpty) return '$id.zip';
+
+    final prefix = '$id (';
+    const suffix = ').zip';
+    final titleBudget =
+        _maxArchiveFileNameBytes - utf8.encode('$prefix$suffix').length;
+    if (titleBudget <= 0) return '$id.zip';
+
+    sanitized = _truncateUtf8(sanitized, titleBudget);
+    sanitized = _trimWindowsTrailingCharacters(sanitized);
+    if (sanitized.isEmpty) return '$id.zip';
+
+    return '$prefix$sanitized$suffix';
+  }
+
+  static String _trimWindowsTrailingCharacters(String value) {
+    var end = value.length;
+    while (end > 0 &&
+        (value.codeUnitAt(end - 1) == 0x20 ||
+            value.codeUnitAt(end - 1) == 0x2E)) {
+      end--;
+    }
+    return end == value.length ? value : value.substring(0, end);
+  }
+
+  static String _truncateUtf8(String value, int maxBytes) {
+    final buffer = StringBuffer();
+    var used = 0;
+
+    for (final rune in value.runes) {
+      final character = String.fromCharCode(rune);
+      final bytes = utf8.encode(character).length;
+      if (used + bytes > maxBytes) break;
+      buffer.write(character);
+      used += bytes;
+    }
+
+    return buffer.toString();
+  }
   static String entry(String archive, String name) => Uri(
     scheme: 'violet-zip',
     path: File(archive).absolute.path,
