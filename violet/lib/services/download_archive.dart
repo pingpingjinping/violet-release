@@ -55,7 +55,7 @@ class DownloadArchive {
       }
     }
 
-    return buffer.toString().replaceAll(RegExp(r'\\s+'), ' ').trim();
+    return buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   static String _trimWindowsTrailingCharacters(String value) {
