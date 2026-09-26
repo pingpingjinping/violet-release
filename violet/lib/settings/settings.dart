@@ -231,6 +231,10 @@ class Settings {
       }
     },
   );
+  static final includeTitleInZipFileName = SettingItem<bool>(
+    'includeTitleInZipFileName',
+    true,
+  );
   static final downloadRule = SettingItem<String>(
     'downloadrule',
     '%(extractor)s/%(id)s/%(file)s.%(ext)s',

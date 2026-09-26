@@ -1952,6 +1952,37 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           ),
         ),
         InkWell(
+          onTap: () async {
+            await Settings.includeTitleInZipFileName.setValue(
+              !Settings.includeTitleInZipFileName.value,
+            );
+            setState(() {
+              _shouldReload = true;
+            });
+          },
+          child: ListTile(
+            leading: Icon(
+              MdiIcons.fileDocumentEditOutline,
+              color: Settings.majorColor.value,
+            ),
+            title: const Text('ZIP 파일명에 작품명 포함'),
+            subtitle: const Text(
+              '다운로드 완료 시 "번호 (작품명).zip" 형식으로 저장합니다.',
+            ),
+            trailing: Switch(
+              value: Settings.includeTitleInZipFileName.value,
+              onChanged: (newValue) async {
+                await Settings.includeTitleInZipFileName.setValue(newValue);
+                setState(() {
+                  _shouldReload = true;
+                });
+              },
+              activeTrackColor: Settings.majorColor.value,
+              activeColor: Settings.majorAccentColor.value,
+            ),
+          ),
+        ),
+        InkWell(
           customBorder: const RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
               bottomLeft: Radius.circular(8.0),

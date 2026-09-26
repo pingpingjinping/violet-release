@@ -208,7 +208,9 @@ class DownloadRoutine {
     await Directory(archiveDirectory).create(recursive: true);
     final archiveName = DownloadArchive.fileName(
       item.url(),
-      tasks!.first.format?.title,
+      Settings.includeTitleInZipFileName.value
+          ? tasks!.first.format?.title
+          : null,
     );
     final archivePath = join(archiveDirectory, archiveName);
     final entries = await DownloadArchive.create(archivePath, originals);
