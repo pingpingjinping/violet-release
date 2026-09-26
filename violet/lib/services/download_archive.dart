@@ -20,6 +20,7 @@ class DownloadArchive {
     sanitized = String.fromCharCodes(
       sanitized.codeUnits.map((unit) => unit < 32 ? 95 : unit),
     );
+    sanitized = _stripEmoji(sanitized);
     sanitized = _trimWindowsTrailingCharacters(sanitized);
     if (sanitized.isEmpty) return '$id.zip';
 
@@ -34,6 +35,27 @@ class DownloadArchive {
     if (sanitized.isEmpty) return '$id.zip';
 
     return '$prefix$sanitized$suffix';
+  }
+
+  static String _stripEmoji(String value) {
+    final buffer = StringBuffer();
+
+    for (final rune in value.runes) {
+      final isEmoji =
+          rune == 0x200D ||
+          rune == 0x20E3 ||
+          rune == 0xFE0E ||
+          rune == 0xFE0F ||
+          (rune >= 0x1F3FB && rune <= 0x1F3FF) ||
+          (rune >= 0x1F000 && rune <= 0x1FAFF) ||
+          (rune >= 0x2600 && rune <= 0x27BF);
+
+      if (!isEmoji) {
+        buffer.writeCharCode(rune);
+      }
+    }
+
+    return buffer.toString().trim();
   }
 
   static String _trimWindowsTrailingCharacters(String value) {
