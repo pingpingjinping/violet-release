@@ -343,10 +343,12 @@ class SearchPageController extends GetxController {
         } on TimeoutException {
           // Do not release the semaphore while the timed-out query is active.
           releasePermit = false;
-          unawaited(search.then<void>(
-            (_) => permit(),
-            onError: (Object _, StackTrace __) => permit(),
-          ));
+          unawaited(
+            search.then<void>(
+              (_) => permit(),
+              onError: (Object _, StackTrace __) => permit(),
+            ),
+          );
           rethrow;
         }
       }
