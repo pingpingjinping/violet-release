@@ -4,21 +4,23 @@ on:
   push:
     branches:
       - "dev"
+    paths:
+      - "violet-server/**"
   workflow_dispatch:
+
+# Do not run the unrelated server CD job on app-only merges.
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   server-changes:
     runs-on: ubuntu-latest
-    # Required permissions
-    permissions:
-      pull-requests: read
     # Set job outputs to values from filter step
     outputs:
       src: ${{ steps.filter.outputs.src }}
     steps:
       - uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
 
       # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v3
@@ -31,13 +33,13 @@ jobs:
 
   deploy-by-docker:
     needs: server-changes
-    if: ${{ needs.app-changes.outputs.src == 'true' || github.event_name != 'push' }}
+    if: ${{ (github.event_name == 'push' && needs.server-changes.outputs.src == 'true') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v2
         with:
-          ref: master
+          ref: dev
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
