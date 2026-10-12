@@ -35,7 +35,6 @@ jobs:
         with:
           filters: |
             src:
-              - ".github/workflows/violet-web-cd.yml"
               - "violet-web/**"
 
   deploy-by-docker:
