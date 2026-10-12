@@ -346,6 +346,12 @@ class _SearchPageState extends ThemeSwitchableState<SearchPage>
             c.latestQuery!.$2,
           );
 
+          // Item Jump starts a fresh result window at the requested offset.
+          // Do not keep the scroll offset of the old result window.
+          if (c.scrollController?.hasClients ?? false) {
+            c.scrollController!.jumpTo(0);
+          }
+          c.resetItemHeight();
           c.doSearch(setPage);
         }
       },

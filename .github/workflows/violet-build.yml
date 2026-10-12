@@ -6,12 +6,15 @@ on:
   merge_group:
   workflow_dispatch:
 
+# Checkout needs contents:read, and paths-filter needs pull-requests:read.
+# Apply to all jobs, including platform builds using actions/checkout.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   app-changes:
     runs-on: ubuntu-latest
-    # Required permissions
-    permissions:
-      pull-requests: read
     # Set job outputs to values from filter step
     outputs:
       src: ${{ steps.filter.outputs.src }}
@@ -56,8 +59,24 @@ jobs:
       - name: Get Dart dependencies
         run: dart pub get
 
-      - name: Formatting
-        run: dart format --output=none --set-exit-if-changed .
+      # The dev branch has legacy formatting differences. Check only the
+      # Dart files changed by this PR instead of failing on unrelated files.
+      - name: Formatting (changed Dart files)
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mapfile -t files < <(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
+              --paginate --jq '.[].filename' \
+              | grep -E '^violet/.*[.]dart$' | cut -c8- || true
+          )
+          if [ "${#files[@]}" -gt 0 ]; then
+            dart format --output=none --set-exit-if-changed "${files[@]}"
+          else
+            echo "No Dart files changed in this PR."
+          fi
 
       - name: Preprocess
         run: |

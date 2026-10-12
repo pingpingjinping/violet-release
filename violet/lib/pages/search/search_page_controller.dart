@@ -17,6 +17,7 @@ import 'package:violet/context/modal_bottom_sheet_context.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/segment/filter_page_controller.dart';
+import 'package:violet/pages/search/search_result_window.dart';
 import 'package:violet/script/script_manager.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/thread/semaphore.dart';
@@ -37,6 +38,7 @@ class SearchPageController extends GetxController {
   double _itemHeight = 0.0;
   bool _scrollInProgress = false;
   bool _queryEnd = false;
+  int _searchGeneration = 0;
 
   var isExtended = false.obs;
   var searchPageNum = 0.obs;
@@ -90,7 +92,7 @@ class SearchPageController extends GetxController {
       }
     }
 
-    if (scrollController!.offset.isNaN) return;
+    if (scrollController!.offset.isNaN || _itemHeight <= 0.1) return;
 
     final itemPerRow = [3, 2, 1, 1, 1][Settings.searchResultType.value.index];
     const searchBarHeight = 64 + 16;
@@ -131,7 +133,31 @@ class SearchPageController extends GetxController {
     //
     //  scroll lazy next query loading
     //
-    if (_scrollInProgress || _queryEnd) return;
+    if (_scrollInProgress) return;
+
+    // A jump starts the local search at an arbitrary item offset. Fetch the
+    // missing earlier results only when the user scrolls toward the top.
+    if (!Settings.searchNetwork.value &&
+        baseCount > 0 &&
+        upScrolling &&
+        scrollController!.offset <=
+            scrollController!.position.viewportDimension / 2) {
+      _scrollInProgress = true;
+      Future.delayed(const Duration(milliseconds: 100), () async {
+        try {
+          await loadPreviousQuery();
+        } catch (e) {
+          print('loadPreviousQuery failed: $e');
+        } finally {
+          _scrollInProgress = false;
+        }
+      }).catchError((e) {
+        _scrollInProgress = false;
+      });
+      return;
+    }
+
+    if (_queryEnd) return;
     if (scrollController!.offset >
         scrollController!.position.maxScrollExtent * 3 / 4) {
       _scrollInProgress = true;
@@ -177,6 +203,9 @@ class SearchPageController extends GetxController {
   }
 
   loadNextQuery() async {
+    final generation = _searchGeneration;
+    final requestQuery = latestQuery;
+    if (requestQuery == null) return;
     final acquire = _querySem.acquire();
     late final CallOnce permit;
     if (Settings.ignoreTimeout.value) {
@@ -200,15 +229,16 @@ class SearchPageController extends GetxController {
 
     var releasePermit = true;
     try {
-      if (_queryEnd ||
-          (latestQuery!.$1 != null && latestQuery!.$1!.offset == -1)) {
+      if (generation != _searchGeneration ||
+          _queryEnd ||
+          (requestQuery.$1 != null && requestQuery.$1!.offset == -1)) {
         return;
       }
 
       final search = HentaiManager.search(
-        latestQuery!.$2,
-        latestQuery!.$1 == null ? 0 : latestQuery!.$1!.offset,
-        latestQuery!.$1 == null ? 0 : latestQuery!.$1!.next ?? 0,
+        requestQuery.$2,
+        requestQuery.$1 == null ? 0 : requestQuery.$1!.offset,
+        requestQuery.$1 == null ? 0 : requestQuery.$1!.next ?? 0,
       );
 
       late final SearchResult next;
@@ -238,7 +268,8 @@ class SearchPageController extends GetxController {
         }
       }
 
-      latestQuery = (next, latestQuery!.$2);
+      if (generation != _searchGeneration) return;
+      latestQuery = (next, requestQuery.$2);
 
       if (next.results.isEmpty) {
         _queryEnd = true;
@@ -275,12 +306,101 @@ class SearchPageController extends GetxController {
     }
   }
 
+  /// Prepend local results before a user-selected Item Jump position.
+  /// Network searches use cursors, so a backward offset query is not safe.
+  Future<void> loadPreviousQuery() async {
+    if (Settings.searchNetwork.value) return;
+    final window = previousSearchWindow(baseCount);
+    final requestQuery = latestQuery;
+    if (window == null || requestQuery == null) return;
+    if (int.tryParse(requestQuery.$2.trim()) != null) return;
+
+    final generation = _searchGeneration;
+    final expectedBase = baseCount;
+    final acquire = _querySem.acquire();
+    late final CallOnce permit;
+    if (Settings.ignoreTimeout.value) {
+      permit = await acquire;
+    } else {
+      try {
+        permit = await acquire.timeout(const Duration(seconds: 5));
+      } on TimeoutException {
+        unawaited(acquire.then<void>((latePermit) => latePermit()));
+        rethrow;
+      }
+    }
+
+    var releasePermit = true;
+    try {
+      if (generation != _searchGeneration || baseCount != expectedBase) return;
+      final search = HentaiManager.search(requestQuery.$2, window.offset);
+      late final SearchResult previous;
+      if (Settings.ignoreTimeout.value) {
+        previous = await search;
+      } else {
+        try {
+          previous = await search.timeout(const Duration(seconds: 10));
+        } on TimeoutException {
+          // Do not release the semaphore while the timed-out query is active.
+          releasePermit = false;
+          unawaited(
+            search.then<void>(
+              (_) => permit(),
+              onError: (Object _, StackTrace __) => permit(),
+            ),
+          );
+          rethrow;
+        }
+      }
+      if (generation != _searchGeneration || baseCount != expectedBase) return;
+      if (previous.results.length < window.count) return;
+
+      // HentaiManager always returns 500 local results. Trim a shorter final
+      // window to avoid duplicating items already present after a jump.
+      final before = previous.results.take(window.count).toList();
+      final controller = scrollController;
+      final hasScrollPosition = controller?.hasClients ?? false;
+      final double? oldOffset = hasScrollPosition ? controller!.offset : null;
+      final double? oldMaxExtent = hasScrollPosition
+          ? controller!.position.maxScrollExtent
+          : null;
+
+      queryResult.insertAll(0, before);
+      baseCount = window.offset;
+      searchPageNum.value += before.length;
+      if (filterController.isPopulationSort) {
+        Population.sortByPopulation(queryResult);
+      }
+      if (isFilterUsed) applyFilter();
+      reloadForce();
+
+      if (oldOffset != null && oldMaxExtent != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (scrollController?.hasClients != true) return;
+          final position = scrollController!.position;
+          final addedExtent = position.maxScrollExtent - oldMaxExtent;
+          scrollController!.jumpTo(
+            (oldOffset + (addedExtent > 0 ? addedExtent : 0.0))
+                .clamp(position.minScrollExtent, position.maxScrollExtent)
+                .toDouble(),
+          );
+        });
+      }
+    } catch (e, st) {
+      Logger.error('[search-previous-error] E: $e\n$st');
+      rethrow;
+    } finally {
+      if (releasePermit) permit();
+    }
+  }
+
   applyFilter() {
     filterResult = filterController.applyFilter(queryResult);
     isFilterUsed = true;
   }
 
   doSearch([int baseCount = 0]) async {
+    _searchGeneration++;
     this.baseCount = baseCount;
     _queryEnd = false;
     queryResult = [];
