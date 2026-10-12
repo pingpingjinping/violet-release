@@ -1,5 +1,10 @@
 name: Build iOS IPA
 
+# Release uploads need contents:write; they are only attempted on push or
+# manual runs. PRs still compile the iOS app without publishing binaries.
+permissions:
+  contents: write
+
 on:
   pull_request:
     branches: ["dev"]
@@ -108,17 +113,35 @@ jobs:
           cd build/ipa
           zip -r -y "$GITHUB_WORKSPACE/violet.ipa" Payload
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: violet-custom-ipa
-          path: violet.ipa
-          if-no-files-found: error
+      # Compiling and zipping succeeded previously, but upload-artifact
+      # failed because the repository's Actions artifact quota was exhausted.
+      # Use a private-repository GitHub Release asset instead. Release assets
+      # do not consume the GitHub Actions artifact storage quota.
+      - name: Publish IPA to GitHub Releases
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -s violet.ipa
+          tag="ios-${GITHUB_REF_NAME}-latest"
+          title="Violet iOS (${GITHUB_REF_NAME} latest)"
+          notes="Unsigned development IPA built from commit ${GITHUB_SHA} (run ${GITHUB_RUN_ID})."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" violet.ipa --clobber
+            gh release edit "$tag" --notes "$notes"
+          else
+            gh release create "$tag" violet.ipa \
+              --target "$GITHUB_SHA" \
+              --title "$title" \
+              --notes "$notes" \
+              --prerelease
+          fi
+          echo "IPA: https://github.com/${GITHUB_REPOSITORY}/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Xcode build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: xcode-build-log
-          path: xcodebuild.log
-          if-no-files-found: ignore
+      - name: Verify IPA exists for pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        run: test -s violet.ipa
+
+      # xcodebuild already streams its full output to the job log. Avoid
+      # upload-artifact for build logs while the Actions quota is exhausted.
