@@ -70,7 +70,7 @@ jobs:
           mapfile -t files < <(
             gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
               --paginate --jq '.[].filename' \
-              | sed -n '/^violet\\/.*\\.dart$/s#^violet/##p'
+              | grep -E '^violet/.*[.]dart$' | cut -c8- || true
           )
           if [ "${#files[@]}" -gt 0 ]; then
             dart format --output=none --set-exit-if-changed "${files[@]}"
