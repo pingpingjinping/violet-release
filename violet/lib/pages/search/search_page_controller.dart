@@ -357,8 +357,9 @@ class SearchPageController extends GetxController {
       // window to avoid duplicating items already present after a jump.
       final before = previous.results.take(window.count).toList();
       final controller = scrollController;
-      final oldOffset = controller?.hasClients ?? false ? controller!.offset : null;
-      final oldMaxExtent = controller?.hasClients ?? false
+      final hasScrollPosition = controller?.hasClients ?? false;
+      final double? oldOffset = hasScrollPosition ? controller!.offset : null;
+      final double? oldMaxExtent = hasScrollPosition
           ? controller!.position.maxScrollExtent
           : null;
 
@@ -377,10 +378,9 @@ class SearchPageController extends GetxController {
           final position = scrollController!.position;
           final addedExtent = position.maxScrollExtent - oldMaxExtent;
           scrollController!.jumpTo(
-            (oldOffset + (addedExtent > 0 ? addedExtent : 0)).clamp(
-              position.minScrollExtent,
-              position.maxScrollExtent,
-            ),
+            (oldOffset + (addedExtent > 0 ? addedExtent : 0.0))
+                .clamp(position.minScrollExtent, position.maxScrollExtent)
+                .toDouble(),
           );
         });
       }
