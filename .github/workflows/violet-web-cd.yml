@@ -4,14 +4,25 @@ on:
   pull_request:
     branches:
       - "dev"
-  merge_group:
+    paths:
+      - "violet-web/**"
+      - ".github/workflows/violet-web-cd.yml"
+  push:
+    branches:
+      - "dev"
+    paths:
+      - "violet-web/**"
+      - ".github/workflows/violet-web-cd.yml"
   workflow_dispatch:
+
+# Read access is required for checkout of a private repository.
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   web-changes:
     runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: read
     outputs:
       src: ${{ steps.filter.outputs.src }}
     steps:
@@ -29,13 +40,15 @@ jobs:
 
   deploy-by-docker:
     needs: web-changes
-    if: ${{ needs.web-changes.outputs.src == 'true' || github.event_name != 'push' }}
+    # Never deploy from a pull request. Deploy web changes after a push to dev,
+    # or when a maintainer explicitly runs this workflow manually.
+    if: ${{ (github.event_name == 'push' && needs.web-changes.outputs.src == 'true') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: dev
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
