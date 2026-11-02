@@ -19,6 +19,7 @@ import 'package:violet/services/download_work_queue.dart';
 class GalleryDownloadProgress extends ChangeNotifier {
   GalleryDownloadProgress(this.item);
   final DownloadItemModel item;
+  final Lock metadataWrite = Lock();
   int extracted = 0, total = 0, completed = 0;
   double bytes = 0, bytesPerSecond = 0;
   bool cancelled = false;
@@ -186,11 +187,14 @@ class DownloadService {
     GalleryDownloadProgress job,
     Map<String, dynamic> fields,
   ) async {
-    if (fields.isEmpty || !_canUpdatePendingMetadata(job)) return;
-    job.item.result = {...job.item.result, ...fields};
-    await job.item.update();
-    job.changed();
-    changes.value++;
+    if (fields.isEmpty) return;
+    await job.metadataWrite.synchronized(() async {
+      if (!_canUpdatePendingMetadata(job)) return;
+      job.item.result = {...job.item.result, ...fields};
+      await job.item.update();
+      job.changed();
+      changes.value++;
+    });
   }
 
   Future<void> _primeMetadata(GalleryDownloadProgress job) async {
@@ -259,8 +263,12 @@ class DownloadService {
       job.changed();
     });
     try {
-      await job.item.update();
-      await routine.selectExtractor();
+      await job.metadataWrite.synchronized(() async {
+        // Metadata prefetch may have updated the pending item's fields.
+        routine.result = Map<String, dynamic>.from(job.item.result);
+        await job.item.update();
+        await routine.selectExtractor();
+      });
       await routine.createTasks(
         progressCallback: (current, total) async {
           job.extracted = current;
