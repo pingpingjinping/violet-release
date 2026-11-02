@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/download_archive.dart';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:violet/component/hentai.dart';
 import 'package:flutter/services.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/database/user/download.dart';
@@ -34,6 +38,8 @@ class DownloadService {
   final stopped = ValueNotifier<DownloadItemModel?>(null);
   final failed = ValueNotifier<DownloadItemModel?>(null);
   final Map<int, GalleryDownloadProgress> _jobs = {};
+  final Queue<GalleryDownloadProgress> _metadataPending = Queue();
+  int _metadataActive = 0;
   Future<void>? _initializing;
   final _submission = Lock();
   late final queue = DownloadWorkQueue(
@@ -58,6 +64,8 @@ class DownloadService {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
     await Download.getInstance();
+    final prefs = await SharedPreferences.getInstance();
+    queue.setMaxConcurrent(prefs.getInt('gallery_concurrent_downloads') ?? 2);
     final db = await CommonUserDatabase.getInstance();
     final items = (await db.query(
       'SELECT * FROM DownloadItem WHERE State BETWEEN 1 AND 4',
@@ -74,6 +82,16 @@ class DownloadService {
   }
 
   GalleryDownloadProgress? progress(int id) => _jobs[id];
+
+  Future<void> setGalleryConcurrentDownloads(int count) async {
+    await initialize();
+    final next = count.clamp(1, 8);
+    await (await SharedPreferences.getInstance()).setInt(
+      'gallery_concurrent_downloads',
+      next,
+    );
+    queue.setMaxConcurrent(next);
+  }
 
   Future<List<DownloadItemModel>> items() async {
     await initialize();
@@ -95,6 +113,17 @@ class DownloadService {
       final item = await (await Download.getInstance()).createNew(url);
       item.download = true;
       item.queryResult = queryResult;
+      if (queryResult != null) {
+        final title = queryResult.title().toString().trim();
+        if (title.isNotEmpty) {
+          item.result['Info'] = '[${queryResult.id()}] $title';
+        }
+        final thumbnail = queryResult.thumbnail();
+        if (thumbnail is String && thumbnail.isNotEmpty) {
+          item.result['Thumbnail'] = thumbnail;
+        }
+        await item.update();
+      }
       _start(item);
       changes.value++;
       return true;
@@ -123,12 +152,85 @@ class DownloadService {
     final job = GalleryDownloadProgress(item);
     _jobs[item.id()] = job;
     job.finished = queue.submit(item.id(), () => _run(job, recover));
+    _metadataPending.add(job);
+    _pumpMetadata();
     // Failures are stored in the item, so callers do not need to await completion.
     unawaited(
       job.finished!.catchError((Object error) {
         debugPrint('Download failed: $error');
       }),
     );
+  }
+
+  /// Resolve titles and covers without waiting for a gallery download slot.
+  /// Metadata requests are limited independently of image downloads.
+  void _pumpMetadata() {
+    while (_metadataActive < 2 && _metadataPending.isNotEmpty) {
+      final job = _metadataPending.removeFirst();
+      _metadataActive++;
+      unawaited(_primeMetadata(job).whenComplete(() {
+        _metadataActive--;
+        _pumpMetadata();
+      }));
+    }
+  }
+
+  bool _canUpdatePendingMetadata(GalleryDownloadProgress job) {
+    return !job.cancelled &&
+        _jobs[job.item.id()] == job &&
+        job.item.state() == 1 &&
+        !queue.activeIds.contains(job.item.id());
+  }
+
+  Future<void> _savePendingMetadata(
+    GalleryDownloadProgress job,
+    Map<String, dynamic> fields,
+  ) async {
+    if (fields.isEmpty || !_canUpdatePendingMetadata(job)) return;
+    job.item.result = {...job.item.result, ...fields};
+    await job.item.update();
+    job.changed();
+    changes.value++;
+  }
+
+  Future<void> _primeMetadata(GalleryDownloadProgress job) async {
+    if (!_canUpdatePendingMetadata(job)) return;
+    try {
+      final item = job.item;
+      final search = item.queryResult == null
+          ? await HentaiManager.idSearch(item.url())
+          : null;
+      final target = item.queryResult ??
+          (search == null || search.results.isEmpty ? null : search.results.first);
+      if (target == null || !_canUpdatePendingMetadata(job)) return;
+      item.queryResult = target;
+
+      final title = target.title().toString().trim();
+      if (title.isNotEmpty && (item.info() == null || item.info()!.isEmpty)) {
+        await _savePendingMetadata(job, {'Info': '[${target.id()}] $title'});
+      }
+
+      if (!_canUpdatePendingMetadata(job) || item.thumbnail() != null) return;
+      final cached = target.thumbnail();
+      if (cached is String && cached.isNotEmpty) {
+        await _savePendingMetadata(job, {'Thumbnail': cached});
+        return;
+      }
+
+      // Some database records omit their cover. Ask the existing image
+      // provider only for the thumbnail, not for every page URL.
+      final provider = await HentaiManager.getImageProvider(target);
+      await provider.init();
+      final thumbnail = await provider.getThumbnailUrl();
+      if (thumbnail.isEmpty || !_canUpdatePendingMetadata(job)) return;
+      final headers = await provider.getHeader(0);
+      await _savePendingMetadata(job, {
+        'Thumbnail': thumbnail,
+        'ThumbnailHeader': jsonEncode(headers),
+      });
+    } catch (error) {
+      debugPrint('Could not prefetch queued gallery metadata: $error');
+    }
   }
 
   Future<void> _run(GalleryDownloadProgress job, bool recover) async {
