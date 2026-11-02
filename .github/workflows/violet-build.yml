@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 # Checkout needs contents:read, and paths-filter needs pull-requests:read.
-# Apply to all jobs, including platform builds using actions/checkout.
+# Apply to the change-detection and Flutter format/analyze jobs.
 permissions:
   contents: read
   pull-requests: read
