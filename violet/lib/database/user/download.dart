@@ -190,8 +190,18 @@ class Download {
     )).map((x) => DownloadItemModel(result: x)).toList();
   }
 
-  Future<DownloadItemModel> createNew(String url) async {
-    var rr = {'URL': url, 'State': 1, 'DateTime': DateTime.now().toString()};
+  Future<DownloadItemModel> createNew(
+    String url, {
+    String? info,
+    String? thumbnail,
+  }) async {
+    final rr = <String, dynamic>{
+      'URL': url,
+      'State': 1,
+      'DateTime': DateTime.now().toString(),
+      if (info != null && info.isNotEmpty) 'Info': info,
+      if (thumbnail != null && thumbnail.isNotEmpty) 'Thumbnail': thumbnail,
+    };
     var db = await CommonUserDatabase.getInstance();
     await db.insert('DownloadItem', rr);
     var ll = (await db.query(
