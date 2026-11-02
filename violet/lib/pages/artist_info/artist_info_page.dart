@@ -395,72 +395,74 @@ class _ArtistInfoPageState extends State<ArtistInfoPage> {
     );
     return Column(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(64, 16, 64, 0),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  flex: femaleTags,
-                  child: Container(height: 8, color: Colors.pink),
-                ),
-                Expanded(
-                  flex: maleTags,
-                  child: Container(height: 8, color: Colors.blue),
-                ),
-                Expanded(
-                  flex: tags,
-                  child: Container(height: 8, color: Colors.grey),
-                ),
-              ],
+        if (lff.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(64, 16, 64, 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8.0),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    flex: femaleTags,
+                    child: Container(height: 8, color: Colors.pink),
+                  ),
+                  Expanded(
+                    flex: maleTags,
+                    child: Container(height: 8, color: Colors.blue),
+                  ),
+                  Expanded(
+                    flex: tags,
+                    child: Container(height: 8, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        Container(padding: const EdgeInsets.all(4)),
-        InkWell(
-          child: SizedBox(
-            width: width - 16 - 32,
-            height: isExpanded
-                ? lff.length * 14.0 + 10
-                : lff.length * 22.0 + 10,
-            child: charts.BarChart(
-              [
-                charts.Series<(String, int), String>(
-                  id: 'Sales',
-                  data: lff,
-                  domainFn: ((String, int) sales, f) => sales.$1.contains(':')
-                      ? sales.$1.split(':')[1]
-                      : sales.$1,
-                  measureFn: ((String, int) sales, _) => sales.$2,
-                  colorFn: ((String, int) sales, _) {
-                    if (sales.$1.startsWith('female:')) {
-                      return charts.MaterialPalette.pink.shadeDefault;
-                    } else if (sales.$1.startsWith('male:')) {
-                      return charts.MaterialPalette.blue.shadeDefault;
-                    } else {
-                      return charts.MaterialPalette.gray.shadeDefault;
-                    }
-                  },
-                ),
-              ],
-              primaryMeasureAxis: Settings.themeWhat.value ? axis2 : null,
-              domainAxis: Settings.themeWhat.value ? axis1 : null,
-              animate: true,
-              vertical: false,
+          Container(padding: const EdgeInsets.all(4)),
+          InkWell(
+            child: SizedBox(
+              width: width - 16 - 32,
+              height: isExpanded
+                  ? lff.length * 14.0 + 10
+                  : lff.length * 22.0 + 10,
+              child: charts.BarChart(
+                [
+                  charts.Series<(String, int), String>(
+                    id: 'Sales',
+                    data: lff,
+                    domainFn: ((String, int) sales, f) => sales.$1.contains(':')
+                        ? sales.$1.split(':')[1]
+                        : sales.$1,
+                    measureFn: ((String, int) sales, _) => sales.$2,
+                    colorFn: ((String, int) sales, _) {
+                      if (sales.$1.startsWith('female:')) {
+                        return charts.MaterialPalette.pink.shadeDefault;
+                      } else if (sales.$1.startsWith('male:')) {
+                        return charts.MaterialPalette.blue.shadeDefault;
+                      } else {
+                        return charts.MaterialPalette.gray.shadeDefault;
+                      }
+                    },
+                  ),
+                ],
+                primaryMeasureAxis: Settings.themeWhat.value ? axis2 : null,
+                domainAxis: Settings.themeWhat.value ? axis1 : null,
+                animate: true,
+                vertical: false,
+              ),
             ),
+            onTap: () {},
+            onTapCancel: () {
+              isExpanded = !isExpanded;
+              if (isExpanded) {
+                lff = lffOrigin;
+              } else {
+                lff = lffOrigin.take(5).toList();
+              }
+              setState(() {});
+            },
           ),
-          onTap: () {},
-          onTapCancel: () {
-            isExpanded = !isExpanded;
-            if (isExpanded) {
-              lff = lffOrigin;
-            } else {
-              lff = lffOrigin.take(5).toList();
-            }
-            setState(() {});
-          },
-        ),
+        ],
         ExpandableNotifier(
           controller: ec,
           child: Padding(
