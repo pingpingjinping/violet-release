@@ -1,13 +1,16 @@
 name: Build iOS IPA
 
-# Build automatically only after changes reach main; manual releases
+# Build automatically when app changes reach dev; manual releases
 # remain available through workflow_dispatch.
 permissions:
   contents: write
 
 on:
   push:
-    branches: ["main"]
+    branches: ["dev"]
+    paths:
+      - "violet/**"
+      - ".github/workflows/build-ios.yml"
   workflow_dispatch:
 
 jobs:
@@ -110,7 +113,7 @@ jobs:
       # Use a private-repository GitHub Release asset instead. Release assets
       # do not consume the GitHub Actions artifact storage quota.
       - name: Publish IPA to GitHub Releases
-        if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/dev' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
