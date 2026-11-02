@@ -204,8 +204,10 @@ class DownloadService {
       final search = item.queryResult == null
           ? await HentaiManager.idSearch(item.url())
           : null;
-      final target = item.queryResult ??
-          (search == null || search.results.isEmpty ? null : search.results.first);
+      var target = item.queryResult;
+      if (target == null && search != null && search.results.isNotEmpty) {
+        target = search.results.first;
+      }
       if (target == null || !_canUpdatePendingMetadata(job)) return;
       item.queryResult = target;
 
