@@ -164,7 +164,9 @@ void main() {
     },
   );
 
-  test('A stalled screen-lock response cannot block queued downloads', () async {
+  test(
+    'A stalled screen-lock response cannot block queued downloads',
+    () async {
     final wakePending = Completer<void>();
     final started = Completer<void>();
     final queue = DownloadWorkQueue(
@@ -186,7 +188,8 @@ void main() {
       wakePending.complete();
       queue.dispose();
     }
-  });
+    },
+  );
 
   test('Platform screen-lock errors do not prevent downloading', () async {
     var ran = false;
