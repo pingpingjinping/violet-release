@@ -111,20 +111,22 @@ class DownloadService {
     return _submission.synchronized(() async {
       if (await _hasActiveDownload(url)) return false;
 
-      final item = await (await Download.getInstance()).createNew(url);
+      // Store preview metadata in the original INSERT. An extra awaited
+      // UPDATE after creating State 1 could leave an orphaned queued entry
+      // if that update stalls or fails before _start() is called.
+      final title = queryResult?.title().toString().trim();
+      final previewThumbnail = queryResult?.thumbnail();
+      final item = await (await Download.getInstance()).createNew(
+        url,
+        info: title != null && title.isNotEmpty
+            ? '[${queryResult!.id()}] $title'
+            : null,
+        thumbnail: previewThumbnail is String && previewThumbnail.isNotEmpty
+            ? previewThumbnail
+            : null,
+      );
       item.download = true;
       item.queryResult = queryResult;
-      if (queryResult != null) {
-        final title = queryResult.title().toString().trim();
-        if (title.isNotEmpty) {
-          item.result['Info'] = '[${queryResult.id()}] $title';
-        }
-        final thumbnail = queryResult.thumbnail();
-        if (thumbnail is String && thumbnail.isNotEmpty) {
-          item.result['Thumbnail'] = thumbnail;
-        }
-        await item.update();
-      }
       _start(item);
       changes.value++;
       return true;
