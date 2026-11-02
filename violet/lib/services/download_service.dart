@@ -210,24 +210,28 @@ class DownloadService {
         await _savePendingMetadata(job, {'Info': '[${target.id()}] $title'});
       }
 
-      if (!_canUpdatePendingMetadata(job) || item.thumbnail() != null) return;
-      final cached = target.thumbnail();
-      if (cached is String && cached.isNotEmpty) {
-        await _savePendingMetadata(job, {'Thumbnail': cached});
+      if (!_canUpdatePendingMetadata(job) || item.thumbnailHeader() != null) {
         return;
       }
 
-      // Some database records omit their cover. Ask the existing image
-      // provider only for the thumbnail, not for every page URL.
-      final provider = await HentaiManager.getImageProvider(target);
-      await provider.init();
-      final thumbnail = await provider.getThumbnailUrl();
-      if (thumbnail.isEmpty || !_canUpdatePendingMetadata(job)) return;
-      final headers = await provider.getHeader(0);
-      await _savePendingMetadata(job, {
-        'Thumbnail': thumbnail,
-        'ThumbnailHeader': jsonEncode(headers),
-      });
+      // Reuse the app's existing provider for the cover and its HTTP headers,
+      // without expanding all page download URLs ahead of the queue.
+      try {
+        final provider = await HentaiManager.getImageProvider(target);
+        await provider.init();
+        final thumbnail = await provider.getThumbnailUrl();
+        if (thumbnail.isEmpty || !_canUpdatePendingMetadata(job)) return;
+        final headers = await provider.getHeader(0);
+        await _savePendingMetadata(job, {
+          'Thumbnail': thumbnail,
+          'ThumbnailHeader': jsonEncode(headers),
+        });
+      } catch (_) {
+        final cached = target.thumbnail();
+        if (cached is String && cached.isNotEmpty) {
+          await _savePendingMetadata(job, {'Thumbnail': cached});
+        }
+      }
     } catch (error) {
       debugPrint('Could not prefetch queued gallery metadata: $error');
     }
