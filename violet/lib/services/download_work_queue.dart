@@ -6,11 +6,16 @@ import 'package:flutter/foundation.dart';
 /// Runs a small number of gallery jobs in parallel while image transfers still
 /// share the downloader's global thread limit.
 class DownloadWorkQueue extends ChangeNotifier {
-  DownloadWorkQueue({required this.keepAwake, int maxConcurrent = 2})
-    : assert(maxConcurrent > 0),
-      _maxConcurrent = maxConcurrent;
+  DownloadWorkQueue({
+    required this.keepAwake,
+    int maxConcurrent = 2,
+    this.keepAwakeTimeout = const Duration(seconds: 2),
+  }) : assert(maxConcurrent > 0),
+       assert(keepAwakeTimeout > Duration.zero),
+       _maxConcurrent = maxConcurrent;
 
   final Future<void> Function(bool) keepAwake;
+  final Duration keepAwakeTimeout;
   int _maxConcurrent;
   int get maxConcurrent => _maxConcurrent;
 
@@ -73,7 +78,9 @@ class DownloadWorkQueue extends ChangeNotifier {
   Future<void> _awake(bool enabled) async {
     // A platform wake-lock failure must not prevent downloads.
     try {
-      await keepAwake(enabled);
+      // The platform screen-lock callback must not block all download slots
+      // indefinitely if an iOS/Android method-channel response is lost.
+      await keepAwake(enabled).timeout(keepAwakeTimeout);
     } catch (error) {
       debugPrint('Download keep-awake: $error');
     }

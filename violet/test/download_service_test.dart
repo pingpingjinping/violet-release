@@ -164,6 +164,33 @@ void main() {
     },
   );
 
+  test(
+    'A stalled screen-lock response cannot block queued downloads',
+    () async {
+      final wakePending = Completer<void>();
+      final started = Completer<void>();
+      final queue = DownloadWorkQueue(
+        keepAwake: (enabled) =>
+            enabled ? wakePending.future : Future<void>.value(),
+        keepAwakeTimeout: const Duration(milliseconds: 10),
+      );
+
+      try {
+        final download = queue.submit(1, () async {
+          started.complete();
+        });
+
+        await started.future.timeout(const Duration(seconds: 1));
+        await download;
+        expect(queue.pendingCount, 0);
+        expect(queue.totalCount, 0);
+      } finally {
+        wakePending.complete();
+        queue.dispose();
+      }
+    },
+  );
+
   test('Platform screen-lock errors do not prevent downloading', () async {
     var ran = false;
     final queue = DownloadWorkQueue(
