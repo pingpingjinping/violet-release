@@ -664,7 +664,12 @@ class _ThumbnailWidgetState extends State<_ThumbnailWidget> {
     final header = await ScriptManager.runHitomiGetHeaderContent(
       widget.id.toString(),
     );
-    return (value.urls[0], header);
+    if (value.urls.isNotEmpty) return (value.urls.first, header);
+    final fallback = widget.thumbnail;
+    if (fallback != null && Uri.tryParse(fallback)?.hasScheme == true) {
+      return (fallback, header);
+    }
+    throw StateError('No thumbnail available for gallery ${widget.id}');
   }
 
   @override
@@ -709,15 +714,17 @@ class _ThumbnailWidgetState extends State<_ThumbnailWidget> {
   }
 
   Widget _thumbnailImage() {
-    if (widget.id == null) {
-      final headers = <String, String>{};
-      if (widget.thumbnailHeader != null) {
-        final decoded =
-            jsonDecode(widget.thumbnailHeader!) as Map<String, dynamic>;
-        for (final entry in decoded.entries) {
-          headers[entry.key] = entry.value as String;
-        }
+    final headers = <String, String>{};
+    if (widget.thumbnailHeader != null) {
+      final decoded =
+          jsonDecode(widget.thumbnailHeader!) as Map<String, dynamic>;
+      for (final entry in decoded.entries) {
+        headers[entry.key] = entry.value as String;
       }
+    }
+
+    // Prefer the cover URL already resolved and stored for queued galleries.
+    if (widget.id == null || widget.thumbnailHeader != null) {
       return _networkImage(widget.thumbnail!, headers);
     }
 
