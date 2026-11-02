@@ -31,6 +31,8 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          # On a main push, compare against the previous main commit.
+          base: ${{ github.event_name == 'push' && github.event.before || 'dev' }}
           filters: |
             src:      
               - ".github/workflows/violet-build.yml"
