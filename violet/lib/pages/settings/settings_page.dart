@@ -1818,7 +1818,11 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
               await DownloadService.instance.setGalleryConcurrentDownloads(
                 int.parse(text.text),
               );
-              if (mounted) setState(() {});
+              if (mounted) {
+                setState(() {
+                  _shouldReload = true;
+                });
+              }
             }
             text.dispose();
           },
