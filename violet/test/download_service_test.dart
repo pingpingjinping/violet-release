@@ -64,6 +64,50 @@ void main() {
   );
 
   test(
+    'Changing gallery concurrency starts pending work without cancelling active jobs',
+    () async {
+      final first = Completer<void>();
+      final second = Completer<void>();
+      final third = Completer<void>();
+      final started = <int>[];
+      final queue = DownloadWorkQueue(
+        keepAwake: (_) async {},
+        maxConcurrent: 1,
+      );
+
+      final a = queue.submit(1, () async {
+        started.add(1);
+        await first.future;
+      });
+      final b = queue.submit(2, () async {
+        started.add(2);
+        await second.future;
+      });
+      final c = queue.submit(3, () async {
+        started.add(3);
+        await third.future;
+      });
+
+      await Future<void>.delayed(Duration.zero);
+      expect(started, [1]);
+      expect(queue.pendingCount, 2);
+
+      queue.setMaxConcurrent(3);
+      await Future<void>.delayed(Duration.zero);
+      expect(started, [1, 2, 3]);
+      expect(queue.activeIds, {1, 2, 3});
+
+      queue.setMaxConcurrent(1);
+      expect(queue.activeIds.length, 3);
+      first.complete();
+      second.complete();
+      third.complete();
+      await Future.wait([a, b, c]);
+      queue.dispose();
+    },
+  );
+
+  test(
     'A failed gallery releases the screen and does not block the next gallery',
     () async {
       final wake = <bool>[];

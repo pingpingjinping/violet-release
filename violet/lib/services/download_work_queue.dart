@@ -6,13 +6,23 @@ import 'package:flutter/foundation.dart';
 /// Runs a small number of gallery jobs in parallel while image transfers still
 /// share the downloader's global thread limit.
 class DownloadWorkQueue extends ChangeNotifier {
-  DownloadWorkQueue({
-    required this.keepAwake,
-    this.maxConcurrent = 2,
-  }) : assert(maxConcurrent > 0);
+  DownloadWorkQueue({required this.keepAwake, int maxConcurrent = 2})
+    : assert(maxConcurrent > 0),
+      _maxConcurrent = maxConcurrent;
 
   final Future<void> Function(bool) keepAwake;
-  final int maxConcurrent;
+  int _maxConcurrent;
+  int get maxConcurrent => _maxConcurrent;
+
+  /// Changes the gallery limit without interrupting downloads already running.
+  void setMaxConcurrent(int count) {
+    final next = count.clamp(1, 8);
+    if (_maxConcurrent == next) return;
+    _maxConcurrent = next;
+    notifyListeners();
+    unawaited(_pump());
+  }
+
   final Queue<(int, Future<void> Function(), Completer<void>)> _pending =
       Queue();
   final Map<int, Future<void>> _submitted = {};

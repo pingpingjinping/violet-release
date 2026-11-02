@@ -1,21 +1,13 @@
 name: Build iOS IPA
 
-# Release uploads need contents:write; they are only attempted on push or
-# manual runs. PRs still compile the iOS app without publishing binaries.
+# Build automatically only after changes reach main; manual releases
+# remain available through workflow_dispatch.
 permissions:
   contents: write
 
 on:
-  pull_request:
-    branches: ["dev"]
-    paths:
-      - "violet/lib/services/download*.dart"
-      - "violet/lib/pages/download/**"
-      - "violet/lib/downloader/**"
-      - "violet/ios/Runner/AppDelegate.swift"
-      - ".github/workflows/build-ios.yml"
   push:
-    branches: ["dev", "main", "master"]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -118,7 +110,7 @@ jobs:
       # Use a private-repository GitHub Release asset instead. Release assets
       # do not consume the GitHub Actions artifact storage quota.
       - name: Publish IPA to GitHub Releases
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -138,10 +130,6 @@ jobs:
               --prerelease
           fi
           echo "IPA: https://github.com/${GITHUB_REPOSITORY}/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Verify IPA exists for pull request
-        if: ${{ github.event_name == 'pull_request' }}
-        run: test -s violet.ipa
 
       # xcodebuild already streams its full output to the job log. Avoid
       # upload-artifact for build logs while the Actions quota is exhausted.

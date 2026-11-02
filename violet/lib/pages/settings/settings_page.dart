@@ -34,6 +34,7 @@ import 'package:violet/component/index.dart';
 import 'package:violet/database/database.dart';
 import 'package:violet/database/user/bookmark.dart';
 import 'package:violet/downloader/isolate_downloader.dart';
+import 'package:violet/services/download_service.dart';
 import 'package:violet/locale/locale.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/other/dialogs.dart';
@@ -550,9 +551,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           leading: const Icon(Icons.dns_outlined),
           title: const Text('작품 서버 주소'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ServerSettingsPage())),
         ),
         ListTile(
           leading: const Icon(Icons.backup_outlined),
@@ -1753,11 +1754,81 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           ),
         ),
         ListTile(
+          leading: Icon(Icons.layers, color: Settings.majorColor.value),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('동시 작품 다운로드 수'),
+              FutureBuilder(
+                future: SharedPreferences.getInstance(),
+                builder: (context, AsyncSnapshot<SharedPreferences> snapshot) {
+                  return Text(
+                    '${Translations.instance!.trans('curthread')}: ${snapshot.data?.getInt('gallery_concurrent_downloads') ?? 2}',
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              ),
+            ],
+          ),
+          trailing: const Icon(Icons.keyboard_arrow_right),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            final text = TextEditingController(
+              text: (prefs.getInt('gallery_concurrent_downloads') ?? 2)
+                  .toString(),
+            );
+            final dialog = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                title: const Text('동시 작품 다운로드 수 (1~8)'),
+                content: TextField(
+                  controller: text,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context, false);
+                    },
+                    child: Text(Translations.instance!.trans('cancel')),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final count = int.tryParse(text.text);
+                      if (count == null || count < 1 || count > 8) {
+                        await showOkDialog(
+                          context,
+                          '동시 작품 다운로드 수는 1~8개로 설정해 주세요.',
+                        );
+                        return;
+                      }
+                      if (context.mounted) Navigator.pop(context, true);
+                    },
+                    child: Text(Translations.instance!.trans('change')),
+                  ),
+                ],
+              ),
+            );
+            if (dialog == true) {
+              await DownloadService.instance.setGalleryConcurrentDownloads(
+                int.parse(text.text),
+              );
+              if (mounted) setState(() {});
+            }
+            text.dispose();
+          },
+        ),
+        ListTile(
           leading: Icon(MdiIcons.lan, color: Settings.majorColor.value),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(Translations.instance!.trans('threadcount')),
+              const Text('이미지 동시 다운로드 수'),
               FutureBuilder(
                 builder: (context, AsyncSnapshot<SharedPreferences> snapshot) {
                   if (!snapshot.hasData) {
@@ -1966,9 +2037,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
               color: Settings.majorColor.value,
             ),
             title: const Text('ZIP 파일명에 작품명 포함'),
-            subtitle: const Text(
-              '다운로드 완료 시 "번호 (작품명).zip" 형식으로 저장합니다.',
-            ),
+            subtitle: const Text('다운로드 완료 시 "번호 (작품명).zip" 형식으로 저장합니다.'),
             trailing: Switch(
               value: Settings.includeTitleInZipFileName.value,
               onChanged: (newValue) async {
