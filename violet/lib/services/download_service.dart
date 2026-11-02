@@ -169,10 +169,12 @@ class DownloadService {
     while (_metadataActive < 2 && _metadataPending.isNotEmpty) {
       final job = _metadataPending.removeFirst();
       _metadataActive++;
-      unawaited(_primeMetadata(job).whenComplete(() {
-        _metadataActive--;
-        _pumpMetadata();
-      }));
+      unawaited(
+        _primeMetadata(job).whenComplete(() {
+          _metadataActive--;
+          _pumpMetadata();
+        }),
+      );
     }
   }
 
