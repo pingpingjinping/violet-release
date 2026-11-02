@@ -551,9 +551,9 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
           leading: const Icon(Icons.dns_outlined),
           title: const Text('작품 서버 주소'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServerSettingsPage()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ServerSettingsPage())),
         ),
         ListTile(
           leading: const Icon(Icons.backup_outlined),
@@ -2037,9 +2037,7 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
               color: Settings.majorColor.value,
             ),
             title: const Text('ZIP 파일명에 작품명 포함'),
-            subtitle: const Text(
-              '다운로드 완료 시 "번호 (작품명).zip" 형식으로 저장합니다.',
-            ),
+            subtitle: const Text('다운로드 완료 시 "번호 (작품명).zip" 형식으로 저장합니다.'),
             trailing: Switch(
               value: Settings.includeTitleInZipFileName.value,
               onChanged: (newValue) async {
