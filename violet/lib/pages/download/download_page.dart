@@ -359,7 +359,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
               right: 16,
               bottom: 16,
               child: SizedBox(
-                width: 72,
+                width: 184,
                 height: 432,
                 child: Align(
                   alignment: Alignment.bottomRight,
