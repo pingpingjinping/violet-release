@@ -98,6 +98,60 @@ class DownloadArchive {
 
   static bool exists(String source) => File(backingFile(source)).existsSync();
 
+  /// Verify a completed download without extracting or rewriting its ZIP.
+  ///
+  /// A completed gallery normally stores `violet-zip:` references; its
+  /// original loose pages have already been deleted. The archive is checked
+  /// in an isolate so even a large gallery cannot block the UI thread.
+  static Future<bool> isComplete(List<String> sources) => Isolate.run(() {
+    if (sources.isEmpty) return false;
+
+    final zipReferences = sources.every(isEntry);
+    if (!zipReferences) {
+      // Older installations may still have loose completed images.
+      if (sources.any(isEntry)) return false;
+      return sources.every((source) {
+        final file = File(source);
+        return file.existsSync() && file.lengthSync() >= 5;
+      });
+    }
+
+    try {
+      final archivePath = backingFile(sources.first);
+      if (sources.any((source) => backingFile(source) != archivePath)) {
+        return false;
+      }
+      final zipFile = File(archivePath);
+      if (!zipFile.existsSync()) return false;
+
+      final input = InputFileStream(archivePath);
+      try {
+        final archive = ZipDecoder().decodeStream(input);
+        final names = sources.map(entryName).toList();
+        if (archive.length != names.length || names.toSet().length != names.length) {
+          return false;
+        }
+        for (final name in names) {
+          final file = archive.find(name);
+          if (file == null || !file.isFile) return false;
+          final bytes = file.readBytes();
+          if (bytes == null ||
+              bytes.length != file.size ||
+              getCrc32(bytes) != file.crc32) {
+            return false;
+          }
+          file.clear();
+        }
+        return true;
+      } finally {
+        input.closeSync();
+      }
+    } catch (_) {
+      return false;
+    }
+  });
+
+
   static Future<void> _readTail = Future<void>.value();
 
   static Future<Uint8List> read(String source) {
