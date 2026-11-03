@@ -160,10 +160,7 @@ class DownloadService {
     if (queue.contains(item.id())) return;
     final job = GalleryDownloadProgress(item);
     _jobs[item.id()] = job;
-    job.finished = queue.submit(
-      item.id(),
-      () => _run(job, recover, isRetry),
-    );
+    job.finished = queue.submit(item.id(), () => _run(job, recover, isRetry));
     _metadataPending.add(job);
     _pumpMetadata();
     // Failures are stored in the item, so callers do not need to await completion.
@@ -290,7 +287,8 @@ class DownloadService {
       });
       // Fresh downloads overlap address extraction with image downloads.
       // Explicit Retry preserves full extraction; Recovery uses saved paths.
-      final streamFresh = !recover &&
+      final streamFresh =
+          !recover &&
           !isRetry &&
           (job.item.files() == null || job.item.files()!.isEmpty);
       job.streamingExtraction = streamFresh;
