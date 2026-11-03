@@ -51,3 +51,18 @@ ItemPosition? selectScrollEndPage(Iterable<ItemPosition> positions) {
   }
   return best;
 }
+
+
+/// Scale the intrinsic image size to the available display width, using the
+/// same 1.5 px safety inset as the legacy viewer's measured height.
+double? realHeightFromImage({
+  required double width,
+  required int imageWidth,
+  required int imageHeight,
+}) {
+  if (!width.isFinite || width <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return null;
+  }
+  final height = (width * imageHeight / imageWidth - 1.5).floorToDouble();
+  return height >= 1 && height.isFinite ? height : 1;
+}

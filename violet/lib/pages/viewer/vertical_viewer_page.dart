@@ -53,6 +53,18 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   final Set<int> _measuredOnlineImages = {};
   // Delays are tied to a page, not to each rebuild of a scrolled list item.
   final Map<int, Future<int>> _providerDisplayDelays = {};
+  final Map<int, ValueNotifier<double?>> _heldOnlineImageHeights = {};
+  final Map<int, (double, double)> _pendingOnlineEstimates = {};
+  bool _releaseOnlineHeightsQueued = false;
+
+  bool get _stabilizeOnlineLayout =>
+      _anchorMode || _deferDuringScroll;
+
+  ValueNotifier<double?> _imageHold(int index) =>
+      _heldOnlineImageHeights.putIfAbsent(
+        index,
+        () => ValueNotifier<double?>(null),
+      );
 
   bool get _deferDuringScroll =>
       c.provider.useProvider &&
@@ -106,6 +118,9 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
 
   @override
   void dispose() {
+    for (final notifier in _heldOnlineImageHeights.values) {
+      notifier.dispose();
+    }
     _animationController.dispose();
     super.dispose();
   }
@@ -135,7 +150,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         } else if (t is ScrollEndNotification) {
           _onScroll = false;
           _scrollEpoch++;
-          _settleCurrentPageAfterScroll();
+          if (_stabilizeOnlineLayout) {
+            _releaseOnlineHeightChanges();
+          } else {
+            _settleCurrentPageAfterScroll();
+          }
         }
         return false;
       },
@@ -284,6 +303,102 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     );
   }
 
+  /// The viewport stays at each image's loading height during a drag and
+  /// ballistic motion. Apply all real image dimensions after ScrollEnd,
+  /// anchoring only the page that the user was looking at when it stopped.
+  void _releaseOnlineHeightChanges() {
+    if (_releaseOnlineHeightsQueued || c.sliderOnChange) return;
+    final hasHeld = _heldOnlineImageHeights.values.any((n) => n.value != null);
+    if (!hasHeld && _pendingOnlineEstimates.isEmpty) {
+      _pagesChangedDuringScroll.clear();
+      return;
+    }
+    final changed = Set<int>.from(_pagesChangedDuringScroll);
+    _pagesChangedDuringScroll.clear();
+
+    final anchor = selectScrollEndPage(
+      _itemPositionsListener.itemPositions.value,
+    );
+    final anchorIndex = anchor?.index;
+    final anchorStart = anchor?.itemLeadingEdge;
+    final epoch = _scrollEpoch;
+    _releaseOnlineHeightsQueued = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _releaseOnlineHeightsQueued = false;
+      if (!mounted || _onScroll || c.sliderOnChange || epoch != _scrollEpoch) {
+        return;
+      }
+      final pending = Map<int, (double, double)>.from(_pendingOnlineEstimates);
+      _pendingOnlineEstimates.clear();
+      for (final entry in pending.entries) {
+        c.realImgHeight[entry.key] = entry.value.$2;
+        c.estimatedImgHeight[entry.key] = entry.value.$1;
+      }
+      for (final holder in _heldOnlineImageHeights.values) {
+        if (holder.value != null) holder.value = null;
+      }
+      // The parent must rebuild to replace placeholder minHeight constraints
+      // with the now-known image dimensions.
+      setState(() {});
+
+      if (anchorIndex == null ||
+          anchorStart == null ||
+          changed.contains(anchorIndex) ||
+          !changed.any((i) => i < anchorIndex)) {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _onScroll || _scrollEpoch != epoch) return;
+        final current = _itemPositionsListener.itemPositions.value;
+        ItemPosition? same;
+        for (final candidate in current) {
+          if (candidate.index == anchorIndex) {
+            same = candidate;
+            break;
+          }
+        }
+        if (same == null) return;
+        final delta = (same.itemLeadingEdge - anchorStart) *
+            MediaQuery.of(context).size.height;
+        if (!delta.isFinite || delta.abs() < 1 ||
+            delta.abs() > MediaQuery.of(context).size.height * 2) {
+          return;
+        }
+        c.verticalItemScrollController.compensatePixels(delta);
+      });
+    });
+  }
+
+  /// Receive intrinsic image dimensions before the completed network image
+  /// first participates in layout; never derive them from a clipped box.
+  void _onOnlineImageReady(int index, ImageInfo info, double width) {
+    if (!_stabilizeOnlineLayout) return;
+    final actual = realHeightFromImage(
+      width: width,
+      imageWidth: info.image.width,
+      imageHeight: info.image.height,
+    );
+    if (actual == null) return;
+    final old = c.imgHeight[index];
+    if (old > 0 && (old - actual).abs() < 1) return;
+    if (_onScroll) {
+      final placeholder = old > 0
+          ? old
+          : c.estimatedImgHeight[index] > 0
+              ? c.estimatedImgHeight[index]
+              : 300.0;
+      final holder = _imageHold(index);
+      // The callback runs before the completed widget is built, so the
+      // ValueListenableBuilder first mounts with this fixed placeholder.
+      holder.value = placeholder;
+      _pagesChangedDuringScroll.add(index);
+    } else if (_anchorMode) {
+      _queueOnlineAnchorCorrection(index);
+    }
+    c.imgHeight[index] = actual;
+  }
+
   /// Scroll-time size changes are deliberately not corrected mid-gesture.
   /// At ScrollEnd, snapshot the page the user is viewing *at that moment*
   /// and compensate only a subsequent displacement of that same page.
@@ -395,24 +510,30 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           width,
         );
         final oh = await c.provider.provider!.getOriginalImageHeight(index);
+        if (!mounted || !c.onSession.value) return;
         if (h > 0) {
-          setState(() {
-            c.realImgHeight[index] = oh;
-            c.estimatedImgHeight[index] = h;
-          });
+          if (_stabilizeOnlineLayout && _onScroll) {
+            _pendingOnlineEstimates[index] = (h, oh);
+            _pagesChangedDuringScroll.add(index);
+          } else {
+            setState(() {
+              c.realImgHeight[index] = oh;
+              c.estimatedImgHeight[index] = h;
+            });
+          }
         }
       });
     }
 
     // Keep the delay stable across parent rebuilds. A new Future in every
     // build resets FutureBuilder to its spinner even for the same page.
-    final Future<int> future = c.imgHeight[index] == 0
-        ? _providerDisplayDelays.putIfAbsent(
-            index,
-            () =>
-                Future<int>.delayed(const Duration(milliseconds: 300), () => 1),
-          )
-        : Future<int>.value(1);
+    final Future<int> future = _providerDisplayDelays.putIfAbsent(
+      index,
+      () => Future<int>.delayed(
+        const Duration(milliseconds: 300),
+        () => 1,
+      ),
+    );
 
     return FutureBuilder(
       // to avoid loading all images when fast scrolling
@@ -441,11 +562,19 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
                 imageWidgetBuilder: (context, child) {
                   return _imageWidgetBuilder(index, width, child);
                 },
+                onImageReady: _stabilizeOnlineLayout
+                    ? (info) => _onOnlineImageReady(index, info, width)
+                    : null,
+                heldHeight: _stabilizeOnlineLayout ? _imageHold(index) : null,
               ),
             );
 
             return Container(
-              constraints: c.imgHeight[index] != 0
+              constraints: _heldOnlineImageHeights[index]?.value != null
+                  ? BoxConstraints(
+                      minHeight: _heldOnlineImageHeights[index]!.value!,
+                    )
+                  : c.imgHeight[index] != 0
                   ? BoxConstraints(minHeight: c.imgHeight[index])
                   : c.estimatedImgHeight[index] != 0
                   ? BoxConstraints(minHeight: c.estimatedImgHeight[index])
@@ -551,6 +680,9 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   _imageWidgetBuilder(int index, double width, Widget child) {
+    // In stabilized mode the image's intrinsic dimensions are available in
+    // onImageReady. Measuring a temporarily clipped RenderBox is incorrect.
+    if (_stabilizeOnlineLayout) return child;
     final needsMeasurement = c.imgHeight[index] == 0;
     // A completed network image can rebuild or remount without another size
     // change. Never schedule a second anchor correction for that event.
