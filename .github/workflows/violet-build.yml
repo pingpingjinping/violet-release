@@ -66,6 +66,28 @@ jobs:
 
       # The dev branch has legacy formatting differences. Check only the
       # Dart files changed by this PR instead of failing on unrelated files.
+      # Temporary formatter diagnostic; remove after applying formatted output.
+      - name: Print formatted source for CI repair
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          paths = [
+              'lib/services/download_archive.dart',
+              'lib/services/download_service.dart',
+              'test/download_archive_test.dart',
+          ]
+          for path in paths:
+              run = subprocess.run(
+                  ['dart', 'format', '--output=show', path],
+                  capture_output=True, text=True, check=True,
+              )
+              print('DART_FMT_OUTPUT ' + json.dumps(
+                  {'path': path, 'source': run.stdout},
+                  ensure_ascii=True,
+              ), flush=True)
+          PY
+
       - name: Formatting (changed Dart files)
         if: ${{ github.event_name == 'pull_request' }}
         env:
