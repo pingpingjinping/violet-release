@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/download_archive.dart';
+import 'package:violet/pages/common/toast.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,6 +42,7 @@ class DownloadService {
   final stopped = ValueNotifier<DownloadItemModel?>(null);
   final failed = ValueNotifier<DownloadItemModel?>(null);
   final Map<int, GalleryDownloadProgress> _jobs = {};
+  final Set<int> _checkingCompletedRecovery = <int>{};
   final Queue<GalleryDownloadProgress> _metadataPending = Queue();
   int _metadataActive = 0;
   Future<void>? _initializing;
@@ -146,10 +148,51 @@ class DownloadService {
   }
 
   void retry(DownloadItemModel item, {bool recover = false}) {
-    if (queue.contains(item.id())) return;
+    final id = item.id();
+    if (queue.contains(id) || _checkingCompletedRecovery.contains(id)) return;
+
+    // Completed items only have ZIP entry references; their loose page files
+    // were intentionally deleted. Do not reset them to Pending and try to
+    // extract/download every image again when Recovery is pressed.
+    if (recover && item.state() == 0) {
+      _checkingCompletedRecovery.add(id);
+      unawaited(
+        _checkCompletedRecovery(
+          item,
+        ).whenComplete(() => _checkingCompletedRecovery.remove(id)),
+      );
+      return;
+    }
+
     item.result = {...item.result, 'State': 1};
     _start(item, recover: recover, isRetry: true);
     changes.value++;
+  }
+
+  Future<void> _checkCompletedRecovery(DownloadItemModel item) async {
+    try {
+      final intact = await DownloadArchive.isComplete(item.rawFiles());
+      if (intact) {
+        showToast(
+          level: ToastLevel.check,
+          message: '완료된 ZIP이 정상입니다. 다시 다운로드하지 않았습니다.',
+        );
+      } else {
+        // A corrupt/missing ZIP cannot be reconstructed from the removed loose
+        // originals. Do not silently start a complete redownload or destroy
+        // existing archive references; Retry is the explicit fallback.
+        showToast(
+          level: ToastLevel.warning,
+          message: 'ZIP이 없거나 손상되었습니다. 전체 재다운로드는 다시 시도를 사용하세요.',
+        );
+      }
+    } catch (error) {
+      debugPrint('Completed ZIP Recovery verification failed: $error');
+      showToast(
+        level: ToastLevel.warning,
+        message: 'ZIP 확인에 실패했습니다. 다시 시도를 사용하세요.',
+      );
+    }
   }
 
   void _start(
