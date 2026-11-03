@@ -43,3 +43,52 @@ void main() {
     expect(anchor, isNull);
   });
 }
+
+
+test('scroll-end anchor uses the currently visible page', () {
+  final endPosition = selectScrollEndPage([
+    const ItemPosition(
+      index: 99,
+      itemLeadingEdge: -0.8,
+      itemTrailingEdge: 0.2,
+    ),
+    const ItemPosition(
+      index: 100,
+      itemLeadingEdge: 0.2,
+      itemTrailingEdge: 0.9,
+    ),
+    const ItemPosition(
+      index: 101,
+      itemLeadingEdge: 0.9,
+      itemTrailingEdge: 1.5,
+    ),
+  ]);
+  expect(endPosition?.index, 100);
+});
+
+test('scroll-end anchor ignores off-screen pages', () {
+  final endPosition = selectScrollEndPage([
+    const ItemPosition(
+      index: 98,
+      itemLeadingEdge: -2,
+      itemTrailingEdge: -1,
+    ),
+    const ItemPosition(
+      index: 99,
+      itemLeadingEdge: 0.4,
+      itemTrailingEdge: 0.6,
+    ),
+  ]);
+  expect(endPosition?.index, 99);
+});
+
+test('scroll-end anchor can use a still-loading current page', () {
+  final endPosition = selectScrollEndPage([
+    const ItemPosition(
+      index: 100,
+      itemLeadingEdge: -0.4,
+      itemTrailingEdge: 1.2,
+    ),
+  ]);
+  expect(endPosition?.index, 100);
+});

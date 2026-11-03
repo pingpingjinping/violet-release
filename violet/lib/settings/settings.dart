@@ -116,6 +116,11 @@ class Settings {
     'anchorOnlineVerticalScroll',
     false,
   );
+  // Defer online vertical page relayout correction until the scroll has ended.
+  static final deferOnlineVerticalScrollCorrection = SettingItem<bool>(
+    'deferOnlineVerticalScrollCorrection',
+    false,
+  );
   static final animation = SettingItem<bool>('animation', false);
   static final padding = SettingItem<bool>('padding', false);
   static final disableOverlayButton = SettingItem<bool>(

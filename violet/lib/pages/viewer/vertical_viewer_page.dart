@@ -4,12 +4,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:violet/pages/viewer/vertical_scroll_anchor.dart';
 import 'package:get/get.dart';
 import 'package:violet/pages/viewer/image/file_image.dart' as file_image;
 import 'package:violet/pages/viewer/image/provider_image.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/item_positions_listener.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/scrollable_positioned_list.dart';
+import 'package:violet/pages/viewer/vertical_scroll_anchor.dart';
 import 'package:violet/pages/viewer/viewer_controller.dart';
 import 'package:violet/pages/viewer/widget/custom_doubletap_gesture_detector.dart';
 import 'package:violet/pages/viewer/widget/double_point_listener.dart';
@@ -49,6 +49,12 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   int _scrollEpoch = 0;
   bool _anchorCorrectionQueued = false;
   final Set<int> _pagesChangedThisFrame = {};
+  final Set<int> _pagesChangedDuringScroll = {};
+  final Map<int, Future<int>> _providerDisplayDelays = {};
+
+  bool get _deferDuringScroll =>
+      c.provider.useProvider &&
+      Settings.deferOnlineVerticalScrollCorrection.value;
 
   bool get _anchorMode =>
       c.provider.useProvider && Settings.anchorOnlineVerticalScroll.value;
@@ -123,9 +129,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         if (t is ScrollStartNotification) {
           _onScroll = true;
           _scrollEpoch++;
+          _pagesChangedDuringScroll.clear();
         } else if (t is ScrollEndNotification) {
           _onScroll = false;
           _scrollEpoch++;
+          _settleCurrentPageAfterScroll();
         }
         return false;
       },
@@ -257,12 +265,74 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   _patchHeightForDynamicLoadedImage() {
-    if (c.sliderOnChange) return;
+    if (c.sliderOnChange ||
+        !c.verticalItemScrollController.isAttached ||
+        _onScroll) {
+      return;
+    }
+
+    final current = _deferDuringScroll
+        ? selectScrollEndPage(_itemPositionsListener.itemPositions.value)
+        : null;
+    if (_deferDuringScroll && current == null) return;
     c.verticalItemScrollController.scrollTo(
-      index: _latestIndex,
+      index: current?.index ?? _latestIndex,
       duration: const Duration(microseconds: 1),
-      alignment: _latestAlign,
+      alignment: current?.itemLeadingEdge ?? _latestAlign,
     );
+  }
+
+  /// Scroll-time size changes are deliberately not corrected mid-gesture.
+  /// At ScrollEnd, snapshot the page the user is viewing *at that moment*
+  /// and compensate only a subsequent displacement of that same page.
+  void _settleCurrentPageAfterScroll() {
+    if (!_deferDuringScroll || _pagesChangedDuringScroll.isEmpty) {
+      _pagesChangedDuringScroll.clear();
+      return;
+    }
+    final changed = Set<int>.from(_pagesChangedDuringScroll);
+    _pagesChangedDuringScroll.clear();
+    if (c.sliderOnChange || !c.verticalItemScrollController.isAttached) {
+      return;
+    }
+
+    final anchor = selectScrollEndPage(
+      _itemPositionsListener.itemPositions.value,
+    );
+    if (anchor == null) return;
+    final index = anchor.index;
+    final start = anchor.itemLeadingEdge;
+    final epoch = _scrollEpoch;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_deferDuringScroll ||
+          _onScroll ||
+          c.sliderOnChange ||
+          _scrollEpoch != epoch ||
+          changed.contains(index)) {
+        // Current page changing height is allowed to resize naturally.
+        return;
+      }
+
+      final latest = _itemPositionsListener.itemPositions.value;
+      ItemPosition? samePage;
+      for (final position in latest) {
+        if (position.index == index) {
+          samePage = position;
+          break;
+        }
+      }
+      if (samePage == null) return;
+      final viewport = MediaQuery.of(context).size.height;
+      final difference = (samePage.itemLeadingEdge - start) * viewport;
+      if (!difference.isFinite ||
+          difference.abs() < 0.5 ||
+          difference.abs() > viewport) {
+        return;
+      }
+      c.verticalItemScrollController.compensatePixels(difference);
+    });
   }
 
   _storageImageItem(index) {
@@ -329,17 +399,21 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       });
     }
 
-    Future<dynamic> future;
-
-    if (c.imgHeight[index] == 0) {
-      future = Future.delayed(const Duration(milliseconds: 300));
-    } else {
-      future = Future.value(0);
-    }
+    // Keep the delay stable across parent rebuilds. A new Future in every
+    // build resets FutureBuilder to its spinner even for the same page.
+    final Future<int> future = c.imgHeight[index] == 0
+        ? _providerDisplayDelays.putIfAbsent(
+            index,
+            () => Future<int>.delayed(
+              const Duration(milliseconds: 300),
+              () => 1,
+            ),
+          )
+        : Future<int>.value(1);
 
     return FutureBuilder(
       // to avoid loading all images when fast scrolling
-      future: future.then((value) => 1),
+      future: future,
       builder: (context, snapshot) {
         // To prevent the scroll from being chewed,
         // it is necessary to put an empty box for the invisible part.
@@ -466,9 +540,13 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   _imageWidgetBuilder(int index, double width, Widget child) {
+    if (_deferDuringScroll && _onScroll) {
+      _pagesChangedDuringScroll.add(index);
+    }
     if (_anchorMode) _queueOnlineAnchorCorrection(index);
     if (c.imgHeight[index] == 0 || c.imgHeight[index] == 300) {
       Future.delayed(const Duration(milliseconds: 50)).then((value) {
+        if (!mounted) return;
         try {
           final RenderBox renderBoxRed =
               c.imgKeys[index].currentContext!.findRenderObject() as RenderBox;
@@ -481,6 +559,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           // OFF retains the exact legacy correction for A/B comparison.
           // ON uses only the measured viewport-anchor correction above.
           if (!_anchorMode && _latestIndex >= index && !_onScroll) {
+            // When deferral is enabled, always use the *current* visible
+            // position rather than a page remembered before the drag.
             _patchHeightForDynamicLoadedImage();
           }
         } catch (_) {}
