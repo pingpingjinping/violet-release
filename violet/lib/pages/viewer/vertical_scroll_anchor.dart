@@ -26,7 +26,6 @@ ItemPosition? selectVisibleLoadedAnchor(
   return best;
 }
 
-
 /// Choose the page crossing the viewport center at scroll end, or otherwise
 /// the largest visible page. This is measured *now*, never reused from a
 /// previous position before the drag.
