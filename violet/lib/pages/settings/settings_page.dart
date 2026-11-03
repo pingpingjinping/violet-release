@@ -1711,6 +1711,101 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
     ];
   }
 
+  Future<void> _editEhConcurrency({required bool exHentai}) async {
+    final httpSetting = exHentai
+        ? Settings.exHentaiHttpConcurrency
+        : Settings.eHentaiHttpConcurrency;
+    final extractionSetting = exHentai
+        ? Settings.exHentaiExtractionConcurrency
+        : Settings.eHentaiExtractionConcurrency;
+    final httpController = TextEditingController(
+      text: httpSetting.value.toString(),
+    );
+    final extractionController = TextEditingController(
+      text: extractionSetting.value.toString(),
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(exHentai ? 'ExHentai 설정' : 'E-Hentai 설정'),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: httpController,
+                keyboardType: TextInputType.number,
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'HTTP 동시 요청 수 (1~8)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: extractionController,
+                keyboardType: TextInputType.number,
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: const InputDecoration(
+                  labelText: '주소 추출 동시 작업 수 (1~8)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'UAYOR: 높은 동시 요청 수는 서버 제한이나 접속 차단을 유발할 수 있습니다.',
+                style: TextStyle(fontSize: 12, color: Colors.orange),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              final httpCount = int.tryParse(httpController.text);
+              final extractCount = int.tryParse(extractionController.text);
+              if (httpCount == null ||
+                  httpCount < 1 ||
+                  httpCount > 8 ||
+                  extractCount == null ||
+                  extractCount < 1 ||
+                  extractCount > 8) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('각 항목을 1~8 사이로 설정해 주세요.')),
+                );
+                return;
+              }
+              Navigator.of(dialogContext).pop(true);
+            },
+            child: const Text('적용'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      await httpSetting.setValue(int.parse(httpController.text));
+      await extractionSetting.setValue(int.parse(extractionController.text));
+      // Active permits drain safely; new requests use the new HTTP limit.
+      http.HttpWrapper.applyConcurrencySettings();
+      if (mounted) {
+        setState(() {
+          _shouldReload = true;
+        });
+      }
+    }
+    httpController.dispose();
+    extractionController.dispose();
+  }
+
   List<Widget> _downloadGroup() {
     return [
       SettingGroupName(name: Translations.instance!.trans('download')),
@@ -1826,6 +1921,26 @@ class _SettingsPageState extends ThemeSwitchableState<SettingsPage>
             }
             text.dispose();
           },
+        ),
+        ListTile(
+          leading: Icon(Icons.public, color: Settings.majorColor.value),
+          title: const Text('E-Hentai'),
+          subtitle: Text(
+            'HTTP 요청 ${Settings.eHentaiHttpConcurrency.value}개 · '
+            '주소 추출 ${Settings.eHentaiExtractionConcurrency.value}개',
+          ),
+          trailing: const Icon(Icons.keyboard_arrow_right),
+          onTap: () => _editEhConcurrency(exHentai: false),
+        ),
+        ListTile(
+          leading: Icon(Icons.public, color: Settings.majorColor.value),
+          title: const Text('ExHentai'),
+          subtitle: Text(
+            'HTTP 요청 ${Settings.exHentaiHttpConcurrency.value}개 · '
+            '주소 추출 ${Settings.exHentaiExtractionConcurrency.value}개',
+          ),
+          trailing: const Icon(Icons.keyboard_arrow_right),
+          onTap: () => _editEhConcurrency(exHentai: true),
         ),
         ListTile(
           leading: Icon(MdiIcons.lan, color: Settings.majorColor.value),

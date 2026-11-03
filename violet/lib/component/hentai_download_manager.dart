@@ -6,6 +6,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:violet/component/downloadable.dart';
+import 'package:violet/component/eh/eh_provider.dart';
+import 'package:violet/component/ordered_extraction.dart';
 import 'package:violet/component/hentai.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/settings/settings.dart';
@@ -91,7 +93,7 @@ class HentaiDonwloadManager {
     final result = <DownloadTask>[];
     await gdp.progressCallback(0, provider.length());
 
-    for (var i = 0; i < provider.length(); i++) {
+    Future<DownloadTask> fetchPageTask(int i) async {
       String? page;
       Map<String, String>? header;
       String extension;
@@ -112,7 +114,7 @@ class HentaiDonwloadManager {
         extension = _extensionFromImageUrl(page);
       }
 
-      final task = DownloadTask(
+      return DownloadTask(
         url: page,
         headers: header,
         downloadPath: oldPath,
@@ -131,10 +133,25 @@ class HentaiDonwloadManager {
           length: provider.length().toString(),
         ),
       );
-      result.add(task);
-      if (onTask != null) await onTask(task);
-      await gdp.progressCallback(i + 1, provider.length());
     }
+
+    int extractionConcurrency() {
+      if (provider is! EHentaiImageProvider) return 1;
+      return provider.isEHentai
+          ? Settings.eHentaiExtractionConcurrency.value
+          : Settings.exHentaiExtractionConcurrency.value;
+    }
+
+    await processOrderedBatches<DownloadTask>(
+      total: provider.length(),
+      concurrency: extractionConcurrency,
+      fetch: fetchPageTask,
+      deliver: (task) async {
+        result.add(task);
+        if (onTask != null) await onTask(task);
+        await gdp.progressCallback(result.length, provider.length());
+      },
+    );
     return result;
   }
 
