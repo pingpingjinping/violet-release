@@ -22,6 +22,15 @@ class HttpWrapper {
   static Semaphore throttlerEHentai = Semaphore(maxCount: 4);
   static Map<String, http.Response> cacheResponse = <String, http.Response>{};
 
+  static void applyConcurrencySettings() {
+    throttlerExHentai.setMaxCount(
+      Settings.exHentaiHttpConcurrency.value.clamp(1, 8).toInt(),
+    );
+    throttlerEHentai.setMaxCount(
+      Settings.eHentaiHttpConcurrency.value.clamp(1, 8).toInt(),
+    );
+  }
+
   // Bound session-long EH HTML caching (large galleries contain many pages).
   static void cache(String url, http.Response response) {
     cacheResponse.remove(url);
@@ -91,6 +100,8 @@ Future<http.Response> _ehentaiGet(
   final cached = HttpWrapper.cacheResponse[url];
   if (cached != null) return cached;
 
+  // Apply saved values even on the first request after app startup.
+  HttpWrapper.applyConcurrencySettings();
   final throttler = url.contains('exhentai.org')
       ? HttpWrapper.throttlerExHentai
       : HttpWrapper.throttlerEHentai;

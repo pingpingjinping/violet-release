@@ -153,6 +153,24 @@ class Settings {
   // Download Options
   static final threadCount = SettingItem<int>('thread_count', 4);
 
+  // E-Hentai / ExHentai concurrency defaults preserve the existing limits.
+  static final eHentaiHttpConcurrency = SettingItem<int>(
+    'eh_http_concurrency',
+    4,
+  );
+  static final exHentaiHttpConcurrency = SettingItem<int>(
+    'ex_http_concurrency',
+    1,
+  );
+  static final eHentaiExtractionConcurrency = SettingItem<int>(
+    'eh_extraction_concurrency',
+    1,
+  );
+  static final exHentaiExtractionConcurrency = SettingItem<int>(
+    'ex_extraction_concurrency',
+    1,
+  );
+
   static final useInnerStorage = FutureSettingItem<bool>(
     'useinnerstorage',
     () async {

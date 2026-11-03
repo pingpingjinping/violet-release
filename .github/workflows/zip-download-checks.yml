@@ -42,5 +42,9 @@ jobs:
           lib/pages/viewer/overlay/viewer_gallery.dart
           lib/pages/viewer/overlay/viewer_overlay.dart
           test/download_archive_test.dart
-      - name: Verify ZIP round trips, decoder and download queue
-        run: flutter test test/download_archive_test.dart test/download_service_test.dart
+      - name: Verify ZIP, download queue and EH concurrency
+        run: >-
+          flutter test
+          test/download_archive_test.dart
+          test/download_service_test.dart
+          test/eh_concurrency_test.dart
