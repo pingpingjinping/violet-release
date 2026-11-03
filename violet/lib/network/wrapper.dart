@@ -21,6 +21,15 @@ class HttpWrapper {
   static Semaphore throttlerExHentai = Semaphore(maxCount: 1);
   static Semaphore throttlerEHentai = Semaphore(maxCount: 4);
   static Map<String, http.Response> cacheResponse = <String, http.Response>{};
+
+  // Bound session-long EH HTML caching (large galleries contain many pages).
+  static void cache(String url, http.Response response) {
+    cacheResponse.remove(url);
+    cacheResponse[url] = response;
+    while (cacheResponse.length > 192) {
+      cacheResponse.remove(cacheResponse.keys.first);
+    }
+  }
 }
 
 bool _isScriptUrl(String url) {
@@ -79,81 +88,51 @@ Future<http.Response> _ehentaiGet(
   Map<String, String>? headers,
   Duration? timeout,
 }) async {
-  if (HttpWrapper.cacheResponse.containsKey(url)) {
-    return HttpWrapper.cacheResponse[url]!;
-  }
+  final cached = HttpWrapper.cacheResponse[url];
+  if (cached != null) return cached;
 
   final throttler = url.contains('exhentai.org')
       ? HttpWrapper.throttlerExHentai
       : HttpWrapper.throttlerEHentai;
-
   final release = await throttler.acquire();
+  try {
+    // Another request may have filled the cache while we waited.
+    final previous = HttpWrapper.cacheResponse[url];
+    if (previous != null) return previous;
 
-  if (HttpWrapper.cacheResponse.containsKey(url)) {
-    throttler.release();
-    return HttpWrapper.cacheResponse[url]!;
-  }
-
-  Logger.info('[Http Request] GET: $url');
-  var retry = 0;
-
-  while (true) {
-    var timeout = false;
-
-    final client = await RhttpCompatibleClient.create(
-      settings: const ClientSettings(httpVersionPref: HttpVersionPref.http3),
-    );
-
-    http.Response response;
-
-    try {
-      final sent = client.get(Uri.parse(url), headers: headers);
-      if (!Settings.ignoreTimeout.value) {
-        sent.timeout(
-          const Duration(seconds: 3),
-          onTimeout: () {
-            timeout = true;
-            throw TimeoutException('Timeout error');
-          },
+    Logger.info('[Http Request] GET: $url');
+    // A stalled request must not hold the global ExHentai slot indefinitely.
+    // Keep retries bounded; never release the same semaphore permit twice.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final client = await RhttpCompatibleClient.create(
+          settings: const ClientSettings(httpVersionPref: HttpVersionPref.http3),
+        );
+        final request = client.get(Uri.parse(url), headers: headers);
+        final response = Settings.ignoreTimeout.value
+            ? await request
+            : await request.timeout(timeout ?? const Duration(seconds: 15));
+        if (response.statusCode != 200) {
+          Logger.warning(
+            '[Http Response] CODE: ${response.statusCode}, GET: $url',
+          );
+        } else if (response.body.trim().isNotEmpty) {
+          HttpWrapper.cache(url, response);
+        }
+        return response;
+      } catch (error, stackTrace) {
+        Logger.error('[Http Request] GET: $url\nE:$error\n$stackTrace');
+        final retryable = error is TimeoutException ||
+            error.toString().contains('Connection reset by peer');
+        if (!retryable || attempt == 2) rethrow;
+        await Future<void>.delayed(
+          Duration(milliseconds: 300 * (attempt + 1)),
         );
       }
-      response = await sent;
-    } catch (e, st) {
-      Logger.error(
-        '[Http Request] GET: $url\n'
-        'E:$e\n'
-        '$st',
-      );
-      release.call();
-      if (!(timeout || e.toString().contains('Connection reset by peer')) ||
-          (timeout && retry > 10)) {
-        rethrow;
-      }
-      response = http.Response('', 200);
     }
-
-    final res = response;
-
-    retry++;
-
-    if (timeout) {
-      if (retry > 3) release.call();
-      Logger.info('[Http Request] GETS: $url, $retry');
-      continue;
-    }
-
-    if (res.statusCode != 200) {
-      Logger.warning('[Http Response] CODE: ${res.statusCode}, GET: $url');
-    }
-
-    Logger.info('[Http Request] GETS: $url');
-
-    if (!HttpWrapper.cacheResponse.containsKey(url) && res.statusCode == 200) {
-      HttpWrapper.cacheResponse[url] = res;
-    }
-
+    throw StateError('ExHentai request retries exhausted');
+  } finally {
     release.call();
-    return res;
   }
 }
 
@@ -169,34 +148,15 @@ Future<http.Response> _scriptGet(
   }
 
   Response res;
-  if (timeout == null) {
-    final client = await RhttpCompatibleClient.create(
-      settings: const ClientSettings(httpVersionPref: HttpVersionPref.http2),
-    );
-
+  final client = await RhttpCompatibleClient.create(
+    settings: const ClientSettings(httpVersionPref: HttpVersionPref.http2),
+  );
+  if (timeout == null || Settings.ignoreTimeout.value) {
     res = await client.get(Uri.parse(url), headers: headers);
   } else {
-    bool isTimeout = false;
-    var retry = 0;
-    do {
-      isTimeout = false;
-
-      final client = await RhttpCompatibleClient.create(
-        settings: const ClientSettings(httpVersionPref: HttpVersionPref.http2),
-      );
-      final sent = client.get(Uri.parse(url), headers: headers);
-      if (!Settings.ignoreTimeout.value) {
-        sent.timeout(
-          timeout,
-          onTimeout: () {
-            isTimeout = true;
-            retry++;
-            return http.Response('', 200);
-          },
-        );
-      }
-      res = await sent;
-    } while (isTimeout && retry < 10);
+    res = await client
+        .get(Uri.parse(url), headers: headers)
+        .timeout(timeout);
   }
 
   if (res.statusCode != 200) {
@@ -206,7 +166,7 @@ Future<http.Response> _scriptGet(
   if (!HttpWrapper.cacheResponse.containsKey(url) &&
       res.statusCode == 200 &&
       res.body.trim().isNotEmpty) {
-    HttpWrapper.cacheResponse[url] = res;
+    HttpWrapper.cache(url, res);
   }
 
   return res;
