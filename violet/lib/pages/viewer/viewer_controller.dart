@@ -104,6 +104,7 @@ class ViewerController extends GetxController {
   /// image infos
   late RxList<bool> isImageLoaded;
   late List<RxString?> urlCache;
+  final Map<int, Future<void>> _pendingPageLoads = {};
   late List<Map<String, String>?> headerCache;
   late List<double> imgHeight;
   late List<double> estimatedImgHeight;
@@ -211,21 +212,24 @@ class ViewerController extends GetxController {
   prev() => move(page.value - (onTwoPage.value ? 2 : 1));
   next() => move(page.value + (onTwoPage.value ? 2 : 1));
 
-  Future<void> load(int index) async {
-    if (provider.useProvider) {
-      if (index < 0 || index >= maxPage) {
-        return;
-      }
+  Future<void> load(int index) {
+    if (!provider.useProvider || index < 0 || index >= maxPage) {
+      return Future<void>.value();
+    }
+    final pending = _pendingPageLoads[index];
+    if (pending != null) return pending;
+    final current = _loadPage(index);
+    _pendingPageLoads[index] = current;
+    return current.whenComplete(() => _pendingPageLoads.remove(index));
+  }
 
-      if (headerCache[index] == null) {
-        var header = await provider.provider!.getHeader(index);
-        headerCache[index] = header;
-      }
-
-      if (urlCache[index] == null) {
-        var url = await provider.provider!.getImageUrl(index);
-        urlCache[index] = RxString(url);
-      }
+  Future<void> _loadPage(int index) async {
+    if (headerCache[index] == null) {
+      headerCache[index] = await provider.provider!.getHeader(index);
+    }
+    if (urlCache[index] == null) {
+      final url = await provider.provider!.getImageUrl(index);
+      urlCache[index] = RxString(url);
     }
   }
 
