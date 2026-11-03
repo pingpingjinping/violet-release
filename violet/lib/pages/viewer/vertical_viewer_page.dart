@@ -150,7 +150,9 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         } else if (t is ScrollEndNotification) {
           _onScroll = false;
           _scrollEpoch++;
-          if (_stabilizeOnlineLayout) {
+          if (_stabilizeOnlineLayout ||
+              _pendingOnlineEstimates.isNotEmpty ||
+              _heldOnlineImageHeights.values.any((n) => n.value != null)) {
             _releaseOnlineHeightChanges();
           } else {
             _settleCurrentPageAfterScroll();
@@ -307,7 +309,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   /// ballistic motion. Apply all real image dimensions after ScrollEnd,
   /// anchoring only the page that the user was looking at when it stopped.
   void _releaseOnlineHeightChanges() {
-    if (_releaseOnlineHeightsQueued || c.sliderOnChange) return;
+    if (_releaseOnlineHeightsQueued) return;
     final hasHeld = _heldOnlineImageHeights.values.any((n) => n.value != null);
     if (!hasHeld && _pendingOnlineEstimates.isEmpty) {
       _pagesChangedDuringScroll.clear();
@@ -342,7 +344,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       // with the now-known image dimensions.
       setState(() {});
 
-      if (anchorIndex == null ||
+      if (c.sliderOnChange ||
+          anchorIndex == null ||
           anchorStart == null ||
           changed.contains(anchorIndex) ||
           !changed.any((i) => i < anchorIndex)) {
