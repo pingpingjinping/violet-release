@@ -292,7 +292,7 @@ class DownloadService {
           !isRetry &&
           (job.item.files() == null || job.item.files()!.isEmpty);
       job.streamingExtraction = streamFresh;
-      final firstDownloads = <Future<void>>[];
+      var pendingStreamingDownloads = 0;
       final downloader = streamFresh
           ? await IsolateDownloader.getInstance()
           : null;
@@ -307,6 +307,14 @@ class DownloadService {
         }
       }
 
+      // Cancellation removes isolate tasks without calling their completion
+      // callbacks. Never wait forever for a cancelled streaming download.
+      Future<void> waitForStreamingDownloads() async {
+        while (!job.cancelled && pendingStreamingDownloads > 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+      }
+
       Future<void> enqueueAsExtracted(DownloadTask task) async {
         if (job.cancelled) return;
         final path = task.downloadPath!;
@@ -315,18 +323,17 @@ class DownloadService {
           job.completed++;
           return;
         }
-        final finished = Completer<void>();
-        firstDownloads.add(finished.future);
+        pendingStreamingDownloads++;
         task.startCallback = () {};
         task.sizeCallback = (_) {};
         task.downloadCallback = bytes;
         task.completeCallback = () {
           complete();
-          if (!finished.isCompleted) finished.complete();
+          pendingStreamingDownloads--;
         };
         task.errorCallback = (message) {
           error(message);
-          if (!finished.isCompleted) finished.complete();
+          pendingStreamingDownloads--;
         };
         downloader!.appendTask(task);
         routine.submittedTaskIds.add(task.taskId);
@@ -347,7 +354,7 @@ class DownloadService {
       job.streamingExtraction = false;
       if (job.cancelled) return;
       if (job.item.state() >= 5) {
-        if (streamFresh) await Future.wait(firstDownloads);
+        if (streamFresh) await waitForStreamingDownloads();
         return;
       }
       if (await routine.checkNothingToDownload()) return;
@@ -356,7 +363,7 @@ class DownloadService {
       if (streamFresh) {
         // Do not mark a gallery complete before extraction and every
         // already-submitted image download have both finished.
-        await Future.wait(firstDownloads);
+        await waitForStreamingDownloads();
       } else {
         job.completed = 0;
       }
