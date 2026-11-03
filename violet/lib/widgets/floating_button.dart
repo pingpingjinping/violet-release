@@ -39,10 +39,7 @@ class TransformFloatButton extends StatelessWidget {
                 ),
                 child: Text(
                   label!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ),
               const SizedBox(width: 6),
