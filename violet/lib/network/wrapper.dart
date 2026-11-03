@@ -106,7 +106,9 @@ Future<http.Response> _ehentaiGet(
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final client = await RhttpCompatibleClient.create(
-          settings: const ClientSettings(httpVersionPref: HttpVersionPref.http3),
+          settings: const ClientSettings(
+            httpVersionPref: HttpVersionPref.http3,
+          ),
         );
         final request = client.get(Uri.parse(url), headers: headers);
         final response = Settings.ignoreTimeout.value
@@ -122,12 +124,11 @@ Future<http.Response> _ehentaiGet(
         return response;
       } catch (error, stackTrace) {
         Logger.error('[Http Request] GET: $url\nE:$error\n$stackTrace');
-        final retryable = error is TimeoutException ||
+        final retryable =
+            error is TimeoutException ||
             error.toString().contains('Connection reset by peer');
         if (!retryable || attempt == 2) rethrow;
-        await Future<void>.delayed(
-          Duration(milliseconds: 300 * (attempt + 1)),
-        );
+        await Future<void>.delayed(Duration(milliseconds: 300 * (attempt + 1)));
       }
     }
     throw StateError('ExHentai request retries exhausted');
@@ -154,9 +155,7 @@ Future<http.Response> _scriptGet(
   if (timeout == null || Settings.ignoreTimeout.value) {
     res = await client.get(Uri.parse(url), headers: headers);
   } else {
-    res = await client
-        .get(Uri.parse(url), headers: headers)
-        .timeout(timeout);
+    res = await client.get(Uri.parse(url), headers: headers).timeout(timeout);
   }
 
   if (res.statusCode != 200) {
