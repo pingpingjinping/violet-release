@@ -312,7 +312,10 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           _onScroll ||
           c.sliderOnChange ||
           _scrollEpoch != epoch ||
-          changed.contains(index)) {
+          changed.contains(index) ||
+          !changed.any(
+            (changedIndex) => heightChangeCanMoveAnchor(changedIndex, index),
+          )) {
         // Current page changing height is allowed to resize naturally.
         return;
       }
@@ -512,6 +515,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     );
     if (visibleAnchor == null) return;
     final anchorIndex = visibleAnchor.index;
+    if (!heightChangeCanMoveAnchor(changedIndex, anchorIndex)) return;
     final previousTop = _loadedImageTop(anchorIndex);
     if (previousTop == null) return;
 
