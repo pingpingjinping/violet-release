@@ -157,9 +157,9 @@ class DownloadService {
     if (recover && item.state() == 0) {
       _checkingCompletedRecovery.add(id);
       unawaited(
-        _checkCompletedRecovery(item).whenComplete(
-          () => _checkingCompletedRecovery.remove(id),
-        ),
+        _checkCompletedRecovery(
+          item,
+        ).whenComplete(() => _checkingCompletedRecovery.remove(id)),
       );
       return;
     }
