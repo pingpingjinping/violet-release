@@ -855,6 +855,13 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
   Widget _floatingButton() {
     return AnimatedFloatingActionButton(
+      buttonLabels: const [
+        '모두 선택',
+        '삭제',
+        '다시 시도',
+        '누락 파일 복구',
+        'ID 복사',
+      ],
       fabButtons: <Widget>[
         FloatingActionButton(
           onPressed: () {
