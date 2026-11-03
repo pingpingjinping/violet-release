@@ -128,7 +128,8 @@ class DownloadArchive {
       try {
         final archive = ZipDecoder().decodeStream(input);
         final names = sources.map(entryName).toList();
-        if (archive.length != names.length || names.toSet().length != names.length) {
+        if (archive.length != names.length ||
+            names.toSet().length != names.length) {
           return false;
         }
         for (final name in names) {
@@ -150,7 +151,6 @@ class DownloadArchive {
       return false;
     }
   });
-
 
   static Future<void> _readTail = Future<void>.value();
 
