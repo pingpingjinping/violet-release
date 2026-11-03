@@ -5,7 +5,7 @@ import 'package:violet/component/ordered_extraction.dart';
 import 'package:violet/thread/semaphore.dart';
 
 void main() {
-  test('bounded extraction starts concurrently and delivers in order', () async {
+  test('bounded extraction delivers in order', () async {
     final requests = List.generate(4, (_) => Completer<int>());
     final started = <int>[];
     final delivered = <int>[];
@@ -36,7 +36,7 @@ void main() {
     expect(delivered, [0, 1, 2, 3]);
   });
 
-  test('resizing a semaphore allows increases and respects decreases', () async {
+  test('semaphore resizing preserves limits', () async {
     final semaphore = Semaphore(maxCount: 1);
     final first = await semaphore.acquire();
     final secondFuture = semaphore.acquire();
