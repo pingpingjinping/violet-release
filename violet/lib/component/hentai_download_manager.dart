@@ -82,7 +82,8 @@ class HentaiDonwloadManager {
 
     // Only Recovery reuses the previously persisted page manifest. Retry
     // deliberately retains the original full-URL extraction behavior.
-    final savedPaths = existingPaths != null &&
+    final savedPaths =
+        existingPaths != null &&
             existingPaths.length == provider.length() &&
             existingPaths.every((path) => !path.startsWith('violet-zip:'))
         ? existingPaths
@@ -97,7 +98,8 @@ class HentaiDonwloadManager {
 
       final oldPath = savedPaths == null ? null : savedPaths[i];
       final previous = oldPath == null ? null : File(oldPath);
-      final alreadyDownloaded = previous != null &&
+      final alreadyDownloaded =
+          previous != null &&
           await previous.exists() &&
           await previous.length() >= 5;
 
