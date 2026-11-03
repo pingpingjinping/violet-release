@@ -26,6 +26,11 @@ ItemPosition? selectVisibleLoadedAnchor(
   return best;
 }
 
+/// Only a page preceding the anchor can push it down when its height changes.
+/// Changes to the anchor itself are left to natural layout.
+bool heightChangeCanMoveAnchor(int changedIndex, int anchorIndex) =>
+    changedIndex < anchorIndex;
+
 /// Choose the page crossing the viewport center at scroll end, or otherwise
 /// the largest visible page. This is measured *now*, never reused from a
 /// previous position before the drag.
