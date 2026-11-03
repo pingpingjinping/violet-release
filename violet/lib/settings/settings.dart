@@ -110,6 +110,12 @@ class Settings {
   static final rightToLeft = SettingItem<bool>('rightToLeft', true);
   static final isHorizontal = SettingItem<bool>('ishorizontal', false);
   static final scrollVertical = SettingItem<bool>('scrollvertical', false);
+  // Experimental: preserve an already visible network image when neighbors load.
+  // Disabled by default; downloaded ZIP galleries keep their existing behavior.
+  static final anchorOnlineVerticalScroll = SettingItem<bool>(
+    'anchorOnlineVerticalScroll',
+    false,
+  );
   static final animation = SettingItem<bool>('animation', false);
   static final padding = SettingItem<bool>('padding', false);
   static final disableOverlayButton = SettingItem<bool>(

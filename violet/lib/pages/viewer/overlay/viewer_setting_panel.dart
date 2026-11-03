@@ -117,6 +117,15 @@ class _ViewerSettingPanelState extends State<ViewerSettingPanel> {
           },
         ),
         _checkBox(
+          title: '온라인 세로 뷰어 위치 안정화 (실험적)',
+          value: Settings.anchorOnlineVerticalScroll.value,
+          enabled: c.provider.useProvider,
+          onChanged: (enabled) async {
+            await Settings.anchorOnlineVerticalScroll.setValue(enabled);
+            if (mounted) setState(() {});
+          },
+        ),
+        _checkBox(
           title: locale.Translations.instance!.trans('togglerighttoleft'),
           value: Settings.rightToLeft.value,
           onChanged: (value) async {
@@ -352,7 +361,7 @@ class _ViewerSettingPanelState extends State<ViewerSettingPanel> {
         activeColor: Settings.majorColor.value,
       ),
       title: Text(title, style: const TextStyle(color: Colors.white)),
-      onTap: () => onChanged(value),
+      onTap: enabled ? () => onChanged(!value) : null,
     );
   }
 }

@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:violet/pages/viewer/vertical_scroll_anchor.dart';
 import 'package:get/get.dart';
 import 'package:violet/pages/viewer/image/file_image.dart' as file_image;
 import 'package:violet/pages/viewer/image/provider_image.dart';
@@ -45,6 +46,12 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   int _latestIndex = 0;
   double _latestAlign = 0;
   bool _onScroll = false;
+  int _scrollEpoch = 0;
+  bool _anchorCorrectionQueued = false;
+  final Set<int> _pagesChangedThisFrame = {};
+
+  bool get _anchorMode =>
+      c.provider.useProvider && Settings.anchorOnlineVerticalScroll.value;
 
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
@@ -115,8 +122,10 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       onNotification: (t) {
         if (t is ScrollStartNotification) {
           _onScroll = true;
+          _scrollEpoch++;
         } else if (t is ScrollEndNotification) {
           _onScroll = false;
+          _scrollEpoch++;
         }
         return false;
       },
@@ -387,7 +396,77 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     );
   }
 
+  double? _loadedImageTop(int index) {
+    if (index < 0 || index >= c.maxPage || !c.isImageLoaded[index]) {
+      return null;
+    }
+    final render = c.imgKeys[index].currentContext?.findRenderObject();
+    if (render is! RenderBox || !render.attached || !render.hasSize) {
+      return null;
+    }
+    return render.localToGlobal(Offset.zero).dy;
+  }
+
+  /// Save one stable, already loaded image before neighboring images finish
+  /// layout. Restore only its measured screen displacement after the frame.
+  /// The newly loaded image itself may shrink/grow naturally.
+  void _queueOnlineAnchorCorrection(int changedIndex) {
+    if (!_anchorMode ||
+        _onScroll ||
+        c.sliderOnChange ||
+        !c.verticalItemScrollController.isAttached) {
+      return;
+    }
+    if (_anchorCorrectionQueued) {
+      _pagesChangedThisFrame.add(changedIndex);
+      return;
+    }
+
+    final positions = _itemPositionsListener.itemPositions.value;
+    final visibleAnchor = selectVisibleLoadedAnchor(
+      positions,
+      excludedIndex: changedIndex,
+      isLoaded: (index) =>
+          index >= 0 && index < c.maxPage && c.isImageLoaded[index],
+    );
+    if (visibleAnchor == null) return;
+    final anchorIndex = visibleAnchor.index;
+    final previousTop = _loadedImageTop(anchorIndex);
+    if (previousTop == null) return;
+
+    final epoch = _scrollEpoch;
+    _anchorCorrectionQueued = true;
+    _pagesChangedThisFrame
+      ..clear()
+      ..add(changedIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _anchorCorrectionQueued = false;
+      final changed = Set<int>.from(_pagesChangedThisFrame);
+      _pagesChangedThisFrame.clear();
+      if (!mounted ||
+          !_anchorMode ||
+          _onScroll ||
+          c.sliderOnChange ||
+          _scrollEpoch != epoch ||
+          changed.contains(anchorIndex)) {
+        return;
+      }
+
+      final currentTop = _loadedImageTop(anchorIndex);
+      if (currentTop == null) return;
+      final difference = currentTop - previousTop;
+      final viewportHeight = MediaQuery.of(context).size.height;
+      if (!difference.isFinite ||
+          difference.abs() < 0.5 ||
+          difference.abs() > viewportHeight * 2) {
+        return;
+      }
+      c.verticalItemScrollController.compensatePixels(difference);
+    });
+  }
+
   _imageWidgetBuilder(int index, double width, Widget child) {
+    if (_anchorMode) _queueOnlineAnchorCorrection(index);
     if (c.imgHeight[index] == 0 || c.imgHeight[index] == 300) {
       Future.delayed(const Duration(milliseconds: 50)).then((value) {
         try {
@@ -399,7 +478,9 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
                 .floor()
                 .toDouble();
           }
-          if (_latestIndex >= index && !_onScroll) {
+          // OFF retains the exact legacy correction for A/B comparison.
+          // ON uses only the measured viewport-anchor correction above.
+          if (!_anchorMode && _latestIndex >= index && !_onScroll) {
             _patchHeightForDynamicLoadedImage();
           }
         } catch (_) {}
