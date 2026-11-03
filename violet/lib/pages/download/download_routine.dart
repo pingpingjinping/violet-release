@@ -88,11 +88,11 @@ class DownloadRoutine {
       if (item.queryResult != null) {
         tasks = await HentaiDonwloadManager.instance()
             .createTaskFromQueryResult(
-          item.queryResult!,
-          generalDownloadProgress,
-          existingPaths: previousFiles.isEmpty ? null : previousFiles,
-          onTask: onTask == null ? null : forwardTask,
-        );
+              item.queryResult!,
+              generalDownloadProgress,
+              existingPaths: previousFiles.isEmpty ? null : previousFiles,
+              onTask: onTask == null ? null : forwardTask,
+            );
       } else {
         tasks = await HentaiDonwloadManager.instance().createTask(
           item.url(),
