@@ -215,7 +215,6 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
           c.precache(context, page - 1),
           c.precache(context, page + 1),
         ]);
-
       }
     }
   }
