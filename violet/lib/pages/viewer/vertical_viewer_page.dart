@@ -409,10 +409,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     final Future<int> future = c.imgHeight[index] == 0
         ? _providerDisplayDelays.putIfAbsent(
             index,
-            () => Future<int>.delayed(
-              const Duration(milliseconds: 300),
-              () => 1,
-            ),
+            () =>
+                Future<int>.delayed(const Duration(milliseconds: 300), () => 1),
           )
         : Future<int>.value(1);
 
@@ -565,8 +563,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       Future.delayed(const Duration(milliseconds: 50)).then((value) {
         if (!mounted) return;
         try {
-          final render =
-              c.imgKeys[index].currentContext?.findRenderObject();
+          final render = c.imgKeys[index].currentContext?.findRenderObject();
           if (render is! RenderBox || !render.attached || !render.hasSize) {
             _measuredOnlineImages.remove(index);
             return;

@@ -72,11 +72,7 @@ void main() {
 
   test('scroll-end anchor ignores off-screen pages', () {
     final endPosition = selectScrollEndPage([
-      const ItemPosition(
-        index: 98,
-        itemLeadingEdge: -2,
-        itemTrailingEdge: -1,
-      ),
+      const ItemPosition(index: 98, itemLeadingEdge: -2, itemTrailingEdge: -1),
       const ItemPosition(
         index: 99,
         itemLeadingEdge: 0.4,
