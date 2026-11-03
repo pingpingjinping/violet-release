@@ -50,6 +50,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   bool _anchorCorrectionQueued = false;
   final Set<int> _pagesChangedThisFrame = {};
   final Set<int> _pagesChangedDuringScroll = {};
+  final Set<int> _measuredOnlineImages = {};
+  // Delays are tied to a page, not to each rebuild of a scrolled list item.
   final Map<int, Future<int>> _providerDisplayDelays = {};
 
   bool get _deferDuringScroll =>
@@ -471,13 +473,19 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   double? _loadedImageTop(int index) {
-    if (index < 0 || index >= c.maxPage || !c.isImageLoaded[index]) {
+    if (index < 0 ||
+        index >= c.maxPage ||
+        !c.isImageLoaded[index] ||
+        c.imgHeight[index] <= 0) {
       return null;
     }
     final render = c.imgKeys[index].currentContext?.findRenderObject();
     if (render is! RenderBox || !render.attached || !render.hasSize) {
       return null;
     }
+    // The image must already have its real dimensions before it can anchor
+    // another page. A still-resizing neighbor causes correction oscillation.
+    if ((render.size.height - c.imgHeight[index]).abs() > 8) return null;
     return render.localToGlobal(Offset.zero).dy;
   }
 
@@ -500,8 +508,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     final visibleAnchor = selectVisibleLoadedAnchor(
       positions,
       excludedIndex: changedIndex,
-      isLoaded: (index) =>
-          index >= 0 && index < c.maxPage && c.isImageLoaded[index],
+      isLoaded: (index) => _loadedImageTop(index) != null,
     );
     if (visibleAnchor == null) return;
     final anchorIndex = visibleAnchor.index;
@@ -530,9 +537,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       if (currentTop == null) return;
       final difference = currentTop - previousTop;
       final viewportHeight = MediaQuery.of(context).size.height;
+      // Ignore tiny layout settling and implausibly large shifts instead of
+      // making a page jump that can restart several image widgets.
       if (!difference.isFinite ||
-          difference.abs() < 0.5 ||
-          difference.abs() > viewportHeight * 2) {
+          difference.abs() < 12 ||
+          difference.abs() > viewportHeight) {
         return;
       }
       c.verticalItemScrollController.compensatePixels(difference);
@@ -540,30 +549,54 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   _imageWidgetBuilder(int index, double width, Widget child) {
-    if (_deferDuringScroll && _onScroll) {
-      _pagesChangedDuringScroll.add(index);
-    }
-    if (_anchorMode) _queueOnlineAnchorCorrection(index);
-    if (c.imgHeight[index] == 0 || c.imgHeight[index] == 300) {
+    final needsMeasurement = c.imgHeight[index] == 0;
+    // A completed network image can rebuild or remount without another size
+    // change. Never schedule a second anchor correction for that event.
+    if (needsMeasurement && _measuredOnlineImages.add(index)) {
+      if (_deferDuringScroll && _onScroll) {
+        _pagesChangedDuringScroll.add(index);
+      }
+      if (_anchorMode) _queueOnlineAnchorCorrection(index);
+      final epoch = _scrollEpoch;
       Future.delayed(const Duration(milliseconds: 50)).then((value) {
         if (!mounted) return;
         try {
-          final RenderBox renderBoxRed =
-              c.imgKeys[index].currentContext!.findRenderObject() as RenderBox;
-          final sizeRender = renderBoxRed.size;
-          if (sizeRender.height != 300) {
-            c.imgHeight[index] = (width / sizeRender.aspectRatio - 1.5)
-                .floor()
-                .toDouble();
+          final render =
+              c.imgKeys[index].currentContext?.findRenderObject();
+          if (render is! RenderBox || !render.attached || !render.hasSize) {
+            _measuredOnlineImages.remove(index);
+            return;
           }
-          // OFF retains the exact legacy correction for A/B comparison.
-          // ON uses only the measured viewport-anchor correction above.
-          if (!_anchorMode && _latestIndex >= index && !_onScroll) {
-            // When deferral is enabled, always use the *current* visible
-            // position rather than a page remembered before the drag.
+
+          final size = render.size;
+          if (size.height <= 0 || size.width <= 0) {
+            _measuredOnlineImages.remove(index);
+            return;
+          }
+          final actualHeight = (width / size.aspectRatio - 1.5)
+              .floor()
+              .toDouble();
+          if (actualHeight <= 0 || !actualHeight.isFinite) {
+            _measuredOnlineImages.remove(index);
+            return;
+          }
+
+          final oldHeight = c.imgHeight[index];
+          if (oldHeight == 0) c.imgHeight[index] = actualHeight;
+          final didChange = oldHeight == 0 && (actualHeight - 300).abs() >= 1;
+          if (!didChange || _anchorMode) return;
+
+          if (_deferDuringScroll && (_onScroll || _scrollEpoch != epoch)) {
+            // A drag or an inertial scroll happened after loading began.
+            // Its page is no longer a valid target for a delayed scrollTo.
+            return;
+          }
+          if (!_onScroll && _latestIndex >= index) {
             _patchHeightForDynamicLoadedImage();
           }
-        } catch (_) {}
+        } catch (_) {
+          _measuredOnlineImages.remove(index);
+        }
       });
     }
     return child;
