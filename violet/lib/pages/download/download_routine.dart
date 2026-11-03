@@ -52,6 +52,8 @@ class DownloadRoutine {
     await _setState(6);
   }
 
+  Future<void> setDownloading() => _setState(3);
+
   Future<void> createTasks({
     required DoubleIntCallback progressCallback,
     bool recover = false,
