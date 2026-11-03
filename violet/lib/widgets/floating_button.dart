@@ -9,29 +9,59 @@ import 'package:violet/style/palette.dart';
 class TransformFloatButton extends StatelessWidget {
   final Widget floatButton;
   final double translateValue;
+  final String? label;
 
   TransformFloatButton({
     required this.floatButton,
     required this.translateValue,
+    this.label,
   }) : super(key: ObjectKey(floatButton));
 
   @override
   Widget build(BuildContext context) {
     return Transform(
       transform: Matrix4.translationValues(0.0, translateValue, 0.0),
-      child: Transform.scale(scale: 0.8, child: floatButton),
+      child: Transform.scale(
+        scale: 0.8,
+        alignment: Alignment.centerRight,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (label != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  label!,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            floatButton,
+          ],
+        ),
+      ),
     );
   }
 }
 
 class AnimatedFloatingActionButton extends StatefulWidget {
   final List<Widget> fabButtons;
+  final List<String>? buttonLabels;
   final AnimatedIconData animatedIconData;
   final VoidCallback exitCallback;
 
   const AnimatedFloatingActionButton({
     super.key,
     required this.fabButtons,
+    this.buttonLabels,
     required this.animatedIconData,
     required this.exitCallback,
   });
@@ -113,6 +143,9 @@ class _AnimatedFloatingActionButtonState
           floatButton: widget.fabButtons[i],
           translateValue:
               _translateButton.value * (widget.fabButtons.length - i),
+          label: widget.buttonLabels != null && i < widget.buttonLabels!.length
+              ? widget.buttonLabels![i]
+              : null,
         ),
       );
     }
@@ -124,6 +157,7 @@ class _AnimatedFloatingActionButtonState
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: _setFabButtons(),
     );
   }

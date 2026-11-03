@@ -507,6 +507,11 @@ class DownloadItemWidgetState extends State<DownloadItemWidget>
         break;
 
       case 3:
+        if (_progress?.streamingExtraction == true) {
+          state = '추출·다운로드 [${_progress!.extracted}/${_progress!.total}]';
+          pp = '받은 이미지 $downloadedFileCount/$downloadTotalFileCount';
+          break;
+        }
         // state =
         //     '[$downloadedFileCount/$downloadTotalFileCount] ($downloadSpeed ${(download / 1024.0 / 1024.0).toStringAsFixed(1)} MB)';
         state =

@@ -209,20 +209,12 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
           await c.precache(context, target);
         }
       } else {
-        if (page.toInt() - 2 >= 0 && c.urlCache[page.toInt() - 2] != null) {
-          CachedNetworkImage.evictFromCache(
-            c.urlCache[page.toInt() - 2]!.value,
-          );
-        }
-        if (page.toInt() + 2 < c.maxPage &&
-            c.urlCache[page.toInt() + 2] != null) {
-          CachedNetworkImage.evictFromCache(
-            c.urlCache[page.toInt() + 2]!.value,
-          );
-        }
-        await c.precache(context, page.toInt() - 1);
-        if (!mounted) return;
-        await c.precache(context, page.toInt() + 1);
+        // Prefetch the neighboring pages even before their URLs are cached.
+        // A slow page must not prevent its other neighbor from loading.
+        await Future.wait([
+          c.precache(context, page - 1),
+          c.precache(context, page + 1),
+        ]);
       }
     }
   }

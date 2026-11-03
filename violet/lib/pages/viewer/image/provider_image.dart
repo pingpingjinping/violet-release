@@ -70,7 +70,7 @@ class _ProviderImageState extends State<ProviderImage> {
       widget.imgUrl,
       key: widget.imgKey,
       headers: widget.imgHeader,
-      retries: 100,
+      retries: 2,
       timeRetry: const Duration(milliseconds: 300),
       fit: BoxFit.cover,
       filterQuality: SettingsWrapper.imageQuality,
@@ -107,10 +107,6 @@ class _ProviderImageState extends State<ProviderImage> {
       );
       _loaded = false;
       c.isImageLoaded[widget.index] = false;
-
-      if (!_refreshing) {
-        state.reLoadImage();
-      }
 
       final retryWidget = _refreshing
           ? const SizedBox(

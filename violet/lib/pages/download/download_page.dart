@@ -359,7 +359,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
               right: 16,
               bottom: 16,
               child: SizedBox(
-                width: 72,
+                width: 184,
                 height: 432,
                 child: Align(
                   alignment: Alignment.bottomRight,
@@ -855,6 +855,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
 
   Widget _floatingButton() {
     return AnimatedFloatingActionButton(
+      buttonLabels: const ['모두 선택', '삭제', '다시 시도', '누락 파일 복구', 'ID 복사'],
       fabButtons: <Widget>[
         FloatingActionButton(
           onPressed: () {
@@ -1185,9 +1186,8 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
                 ) {
                   return FadeTransition(opacity: animation, child: wi);
                 },
-            pageBuilder: (_, __, ___) => DownloadFeaturesMenu(
-              incompleteActive: _incompleteFilterActive,
-            ),
+            pageBuilder: (_, __, ___) =>
+                DownloadFeaturesMenu(incompleteActive: _incompleteFilterActive),
             barrierColor: Colors.black12,
             barrierDismissible: true,
           ),
@@ -1493,9 +1493,7 @@ class _DownloadPageState extends ThemeSwitchableState<DownloadPage>
       filterResult = filterResult.reversed.toList();
     }
 
-    if (hasTagFilter &&
-        !_incompleteFilterActive &&
-        downloading.isNotEmpty) {
+    if (hasTagFilter && !_incompleteFilterActive && downloading.isNotEmpty) {
       filterResult.addAll(downloading.map((e) => itemsMap[e]!).toList());
     }
 

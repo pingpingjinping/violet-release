@@ -52,8 +52,12 @@ class DownloadRoutine {
     await _setState(6);
   }
 
+  Future<void> setDownloading() => _setState(3);
+
   Future<void> createTasks({
     required DoubleIntCallback progressCallback,
+    bool recover = false,
+    Future<void> Function(DownloadTask)? onTask,
   }) async {
     try {
       final generalDownloadProgress = GeneralDownloadProgress(
@@ -68,23 +72,38 @@ class DownloadRoutine {
         },
         progressCallback: progressCallback,
       );
+      final previousFiles = recover ? item.rawFiles() : <String>[];
+      final basepath = await downloadBasePath();
+
+      Future<void> forwardTask(DownloadTask task) async {
+        task.downloadPath ??= join(
+          basepath,
+          task.format!.formatting(
+            HentaiDonwloadManager.instance().defaultFormat(),
+          ),
+        );
+        if (onTask != null) await onTask(task);
+      }
 
       if (item.queryResult != null) {
         tasks = await HentaiDonwloadManager.instance()
             .createTaskFromQueryResult(
               item.queryResult!,
               generalDownloadProgress,
+              existingPaths: previousFiles.isEmpty ? null : previousFiles,
+              onTask: onTask == null ? null : forwardTask,
             );
       } else {
         tasks = await HentaiDonwloadManager.instance().createTask(
           item.url(),
           generalDownloadProgress,
+          existingPaths: previousFiles.isEmpty ? null : previousFiles,
+          onTask: onTask == null ? null : forwardTask,
         );
       }
 
-      final basepath = await downloadBasePath();
-      for (var task in tasks!) {
-        task.downloadPath = join(
+      for (final task in tasks ?? <violetd.DownloadTask>[]) {
+        task.downloadPath ??= join(
           basepath,
           task.format!.formatting(
             HentaiDonwloadManager.instance().defaultFormat(),
@@ -93,7 +112,6 @@ class DownloadRoutine {
       }
     } catch (e) {
       await setFailed(e.toString());
-      return;
     }
   }
 

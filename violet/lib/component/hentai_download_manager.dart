@@ -2,6 +2,7 @@
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:violet/component/downloadable.dart';
@@ -51,64 +52,89 @@ class HentaiDonwloadManager {
 
   Future<List<DownloadTask>?> createTask(
     String url,
-    GeneralDownloadProgress gdp,
-  ) async {
+    GeneralDownloadProgress gdp, {
+    List<String>? existingPaths,
+    Future<void> Function(DownloadTask)? onTask,
+  }) async {
     final query = (await HentaiManager.idSearch(url)).results;
-
-    if (query.isEmpty) {
-      return null;
-    }
-
-    return await createTaskFromQueryResult(query.first, gdp);
+    if (query.isEmpty) return null;
+    return createTaskFromQueryResult(
+      query.first,
+      gdp,
+      existingPaths: existingPaths,
+      onTask: onTask,
+    );
   }
 
   Future<List<DownloadTask>?> createTaskFromQueryResult(
     QueryResult target,
-    GeneralDownloadProgress gdp,
-  ) async {
+    GeneralDownloadProgress gdp, {
+    List<String>? existingPaths,
+    Future<void> Function(DownloadTask)? onTask,
+  }) async {
     gdp.simpleInfoCallback('[${target.id()}] ${target.title()}');
 
-    var provider = await HentaiManager.getImageProvider(target);
-
+    final provider = await HentaiManager.getImageProvider(target);
     await provider.init();
-
-    var thumbnailUrl = await provider.getThumbnailUrl();
-    var thumbnailHeader = await provider.getHeader(0);
+    final thumbnailUrl = await provider.getThumbnailUrl();
+    final thumbnailHeader = await provider.getHeader(0);
     gdp.thumbnailCallback(thumbnailUrl, jsonEncode(thumbnailHeader));
 
-    var result = <DownloadTask>[];
+    // Only Recovery reuses the previously persisted page manifest. Retry
+    // deliberately retains the original full-URL extraction behavior.
+    final savedPaths =
+        existingPaths != null &&
+            existingPaths.length == provider.length() &&
+            existingPaths.every((path) => !path.startsWith('violet-zip:'))
+        ? existingPaths
+        : null;
+    final result = <DownloadTask>[];
+    await gdp.progressCallback(0, provider.length());
 
-    //
-    //    Add Images
-    //
-    for (int i = 0; i < provider.length(); i++) {
-      var page = await provider.getImageUrl(i);
-      var header = await provider.getHeader(i);
+    for (var i = 0; i < provider.length(); i++) {
+      String? page;
+      Map<String, String>? header;
+      String extension;
 
-      result.add(
-        DownloadTask(
-          url: page,
-          headers: header,
-          format: FileNameFormat(
-            title: target.title(),
-            id: target.id().toString(),
-            laugage: target.language(),
-            uploadDate: target.getDateTime().toString(),
-            filenameWithoutExtension: intToString(i, pad: 3),
-            artist: _firstPipeValue(target.artists()),
-            group: _firstPipeValue(target.groups()),
-            extension: _extensionFromImageUrl(page),
-            extractor: 'hentai',
-            downloadDate: DateTime.now().toString(),
-            className: target.classname(),
-            length: provider.length().toString(),
-          ),
+      final oldPath = savedPaths == null ? null : savedPaths[i];
+      final previous = oldPath == null ? null : File(oldPath);
+      final alreadyDownloaded =
+          previous != null &&
+          await previous.exists() &&
+          await previous.length() >= 5;
+
+      if (alreadyDownloaded) {
+        // Existing pages do not need an ExHentai image-page request.
+        extension = path.extension(oldPath!).replaceFirst('.', '');
+      } else {
+        page = await provider.getImageUrl(i);
+        header = await provider.getHeader(i);
+        extension = _extensionFromImageUrl(page);
+      }
+
+      final task = DownloadTask(
+        url: page,
+        headers: header,
+        downloadPath: oldPath,
+        format: FileNameFormat(
+          title: target.title(),
+          id: target.id().toString(),
+          laugage: target.language(),
+          uploadDate: target.getDateTime().toString(),
+          filenameWithoutExtension: intToString(i, pad: 3),
+          artist: _firstPipeValue(target.artists()),
+          group: _firstPipeValue(target.groups()),
+          extension: extension,
+          extractor: 'hentai',
+          downloadDate: DateTime.now().toString(),
+          className: target.classname(),
+          length: provider.length().toString(),
         ),
       );
-
-      gdp.progressCallback(i + 1, provider.length());
+      result.add(task);
+      if (onTask != null) await onTask(task);
+      await gdp.progressCallback(i + 1, provider.length());
     }
-
     return result;
   }
 
