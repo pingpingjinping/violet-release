@@ -175,6 +175,28 @@ class ItemScrollController {
   /// If `false`, then [jumpTo] and [scrollTo] must not be called.
   bool get isAttached => _scrollableListState != null;
 
+  /// Compensate a measured on-screen displacement without re-targeting a
+  /// page index. Unlike scrollTo(), this does not restart the positioned list.
+  /// Never interrupt drag, ballistic scrolling or long-distance transitions.
+  bool compensatePixels(double delta) {
+    final state = _scrollableListState;
+    if (state == null ||
+        state._isTransitioning ||
+        !delta.isFinite ||
+        !state.primary.scrollController.hasClients) {
+      return false;
+    }
+    final controller = state.primary.scrollController;
+    final position = controller.position;
+    if (position.isScrollingNotifier.value) return false;
+    final target = (position.pixels + delta)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < 0.5) return false;
+    controller.jumpTo(target);
+    return true;
+  }
+
   _ScrollablePositionedListState? _scrollableListState;
 
   /// Immediately, without animation, reconfigure the list so that the item at
