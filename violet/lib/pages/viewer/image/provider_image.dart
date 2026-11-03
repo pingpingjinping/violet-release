@@ -157,19 +157,8 @@ class _ProviderImageState extends State<ProviderImage> {
       _loaded = true;
       c.isImageLoaded[widget.index] = true;
       if (imageInfo != null) widget.onImageReady?.call(imageInfo);
-      final completed = widget.imageWidgetBuilder(
-        context,
-        state.completedWidget,
-      );
-      final heldHeight = widget.heldHeight;
-      if (heldHeight == null) return completed;
-      return ValueListenableBuilder<double?>(
-        valueListenable: heldHeight,
-        builder: (context, height, child) {
-          if (height == null) return child!;
-          return SizedBox(height: height, child: child);
-        },
-        child: completed,
+      return _wrapCompleted(
+        widget.imageWidgetBuilder(context, state.completedWidget),
       );
     } else if (state.extendedImageLoadState == LoadState.loading) {
       return SizedBox(
@@ -193,6 +182,21 @@ class _ProviderImageState extends State<ProviderImage> {
 
     c.isImageLoaded[widget.index] = true;
 
-    return state.completedWidget;
+    // ExtendedImage may rebuild after the first completion. Keep the fixed
+    // height wrapper until scrolling fully ends, including on later frames.
+    return _wrapCompleted(state.completedWidget);
+  }
+
+  Widget _wrapCompleted(Widget child) {
+    final heldHeight = widget.heldHeight;
+    if (heldHeight == null) return child;
+    return ValueListenableBuilder<double?>(
+      valueListenable: heldHeight,
+      builder: (context, height, image) {
+        if (height == null) return image!;
+        return SizedBox(height: height, child: image);
+      },
+      child: child,
+    );
   }
 }
