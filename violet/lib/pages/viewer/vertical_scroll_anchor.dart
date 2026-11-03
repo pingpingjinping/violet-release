@@ -25,3 +25,29 @@ ItemPosition? selectVisibleLoadedAnchor(
   }
   return best;
 }
+
+/// Only a page preceding the anchor can push it down when its height changes.
+/// Changes to the anchor itself are left to natural layout.
+bool heightChangeCanMoveAnchor(int changedIndex, int anchorIndex) =>
+    changedIndex < anchorIndex;
+
+/// Choose the page crossing the viewport center at scroll end, or otherwise
+/// the largest visible page. This is measured *now*, never reused from a
+/// previous position before the drag.
+ItemPosition? selectScrollEndPage(Iterable<ItemPosition> positions) {
+  ItemPosition? best;
+  double bestScore = -1;
+  for (final position in positions) {
+    final start = position.itemLeadingEdge.clamp(0.0, 1.0).toDouble();
+    final end = position.itemTrailingEdge.clamp(0.0, 1.0).toDouble();
+    if (end <= start) continue;
+    final coversCenter =
+        position.itemLeadingEdge <= 0.5 && position.itemTrailingEdge >= 0.5;
+    final score = (coversCenter ? 2.0 : 0.0) + end - start;
+    if (score > bestScore) {
+      best = position;
+      bestScore = score;
+    }
+  }
+  return best;
+}

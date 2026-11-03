@@ -4,6 +4,7 @@ on:
     paths:
       - 'violet/lib/**'
       - 'violet/test/download_archive_test.dart'
+      - 'violet/test/vertical_scroll_anchor_test.dart'
       - '.github/workflows/zip-download-checks.yml'
 permissions:
   contents: read

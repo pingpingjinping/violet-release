@@ -126,6 +126,17 @@ class _ViewerSettingPanelState extends State<ViewerSettingPanel> {
           },
         ),
         _checkBox(
+          title: '스크롤 중 보정 방지',
+          value: Settings.deferOnlineVerticalScrollCorrection.value,
+          enabled: c.provider.useProvider,
+          onChanged: (enabled) async {
+            await Settings.deferOnlineVerticalScrollCorrection.setValue(
+              enabled,
+            );
+            if (mounted) setState(() {});
+          },
+        ),
+        _checkBox(
           title: locale.Translations.instance!.trans('togglerighttoleft'),
           value: Settings.rightToLeft.value,
           onChanged: (value) async {
