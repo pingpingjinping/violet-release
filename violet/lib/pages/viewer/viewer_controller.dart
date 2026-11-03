@@ -233,25 +233,27 @@ class ViewerController extends GetxController {
     }
   }
 
-  precache(BuildContext context, int index) async {
+  Future<void> precache(BuildContext context, int index) async {
     if (index < 0 || maxPage <= index) return;
-
-    await load(index);
-
-    if (!context.mounted) return;
-    await precacheImage(
-      CachedNetworkImageProvider(
-        urlCache[index]!.value,
-        headers: headerCache[index],
-        maxWidth: Settings.useLowPerf.value
-            ? (MediaQuery.of(context).size.width * 1.5).toInt()
-            : null,
-      ),
-      context,
-      onError: (error, stackTrace) {
-        Logger.error('[precache-error] E: $error\n$stackTrace');
-      },
-    );
+    try {
+      await load(index);
+      if (!context.mounted) return;
+      await precacheImage(
+        CachedNetworkImageProvider(
+          urlCache[index]!.value,
+          headers: headerCache[index],
+          maxWidth: Settings.useLowPerf.value
+              ? (MediaQuery.of(context).size.width * 1.5).toInt()
+              : null,
+        ),
+        context,
+        onError: (error, stackTrace) {
+          Logger.error('[precache-error] E: $error\n$stackTrace');
+        },
+      );
+    } catch (error, stackTrace) {
+      Logger.error('[precache-error] E: $error\n$stackTrace');
+    }
   }
 
   middleButton() {
