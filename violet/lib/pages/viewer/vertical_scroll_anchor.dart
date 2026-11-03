@@ -15,8 +15,8 @@ ItemPosition? selectVisibleLoadedAnchor(
     if (position.index == excludedIndex || !isLoaded(position.index)) {
       continue;
     }
-    final start = position.itemLeadingEdge.clamp(0.0, 1.0);
-    final end = position.itemTrailingEdge.clamp(0.0, 1.0);
+    final start = position.itemLeadingEdge.clamp(0.0, 1.0).toDouble();
+    final end = position.itemTrailingEdge.clamp(0.0, 1.0).toDouble();
     final visible = end - start;
     if (visible > coverage) {
       best = position;
