@@ -74,8 +74,7 @@ void main() {
     );
 
     final raw = await File(archivePath).readAsBytes();
-    final offset =
-        30 + raw[26] + (raw[27] << 8) + raw[28] + (raw[29] << 8);
+    final offset = 30 + raw[26] + (raw[27] << 8) + raw[28] + (raw[29] << 8);
     raw[offset] ^= 1;
     await File(archivePath).writeAsBytes(raw);
     expect(await DownloadArchive.isComplete(refs), isFalse);
@@ -94,10 +93,7 @@ void main() {
 
   test('archive filename uses id and a Windows-safe title', () {
     expect(
-      DownloadArchive.fileName(
-        '4192094',
-        r'A:B/C\D*E?F"G<H>I|J',
-      ),
+      DownloadArchive.fileName('4192094', r'A:B/C\D*E?F"G<H>I|J'),
       '4192094 (A_B_C_D_E_F_G_H_I_J).zip',
     );
     expect(DownloadArchive.fileName('4192094', '   '), '4192094.zip');
@@ -113,14 +109,8 @@ void main() {
   });
 
   test('archive filename strips emoji for SMB/NAS compatibility', () {
-    expect(
-      DownloadArchive.fileName('3469671', '🦝'),
-      '3469671.zip',
-    );
-    expect(
-      DownloadArchive.fileName('4039448', '♨️🚺🍄'),
-      '4039448.zip',
-    );
+    expect(DownloadArchive.fileName('3469671', '🦝'), '3469671.zip');
+    expect(DownloadArchive.fileName('4039448', '♨️🚺🍄'), '4039448.zip');
     expect(
       DownloadArchive.fileName('4192094', '작품 🍄 제목'),
       '4192094 (작품 제목).zip',
