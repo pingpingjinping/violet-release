@@ -45,6 +45,53 @@ void main() {
     },
   );
 
+  test('Recovery recognizes a completed ZIP without loose pages', () async {
+    final first = await page('a.png', png);
+    final second = await page('b.jpg', [1, 2, 3, 4, 5, 6]);
+    final archivePath = '${root.path}/complete.zip';
+    final references = await DownloadArchive.create(archivePath, [
+      first,
+      second,
+    ]);
+    await DownloadArchive.deleteSources([first, second]);
+
+    expect(await DownloadArchive.isComplete(references), isTrue);
+    expect(File(first).existsSync(), isFalse);
+    expect(File(second).existsSync(), isFalse);
+    expect(File(archivePath).existsSync(), isTrue);
+  });
+
+  test('Recovery detects a missing, damaged, or incomplete ZIP', () async {
+    final first = await page('a.png', png);
+    final archivePath = '${root.path}/damaged.zip';
+    final refs = await DownloadArchive.create(archivePath, [first]);
+    expect(await DownloadArchive.isComplete(refs), isTrue);
+    expect(
+      await DownloadArchive.isComplete([
+        DownloadArchive.entry(archivePath, 'missing.png'),
+      ]),
+      isFalse,
+    );
+
+    final raw = await File(archivePath).readAsBytes();
+    final offset =
+        30 + raw[26] + (raw[27] << 8) + raw[28] + (raw[29] << 8);
+    raw[offset] ^= 1;
+    await File(archivePath).writeAsBytes(raw);
+    expect(await DownloadArchive.isComplete(refs), isFalse);
+
+    await File(archivePath).delete();
+    expect(await DownloadArchive.isComplete(refs), isFalse);
+    expect(await DownloadArchive.isComplete([]), isFalse);
+  });
+
+  test('Recovery also recognizes intact legacy loose-file downloads', () async {
+    final first = await page('a.png', png);
+    expect(await DownloadArchive.isComplete([first]), isTrue);
+    await File(first).delete();
+    expect(await DownloadArchive.isComplete([first]), isFalse);
+  });
+
   test('archive filename uses id and a Windows-safe title', () {
     expect(
       DownloadArchive.fileName(
