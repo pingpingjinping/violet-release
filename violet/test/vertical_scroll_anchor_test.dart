@@ -43,6 +43,12 @@ void main() {
     expect(anchor, isNull);
   });
 
+  test('only an earlier page can push the current anchor', () {
+    expect(heightChangeCanMoveAnchor(99, 100), isTrue);
+    expect(heightChangeCanMoveAnchor(100, 100), isFalse);
+    expect(heightChangeCanMoveAnchor(101, 100), isFalse);
+  });
+
   test('scroll-end anchor uses the currently visible page', () {
     final endPosition = selectScrollEndPage([
       const ItemPosition(
