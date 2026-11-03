@@ -19,6 +19,7 @@ class EHentaiImageProvider extends VioletImageProvider {
   late List<String?> urls;
   late List<String> imgUrls;
   late Semaphore pageThrottler;
+  final Map<int, Future<String>> _pendingImageUrls = {};
   int imagesPerPage;
 
   EHentaiImageProvider({
@@ -61,37 +62,47 @@ class EHentaiImageProvider extends VioletImageProvider {
   }
 
   @override
-  Future<String> getImageUrl(int page) async {
-    if (imgUrls[page] != '') {
-      return imgUrls[page];
-    }
+  Future<String> getImageUrl(int page) {
+    if (imgUrls[page].isNotEmpty) return Future<String>.value(imgUrls[page]);
+    final existing = _pendingImageUrls[page];
+    if (existing != null) return existing;
 
-    await pageThrottler.acquire();
+    // Share ongoing lookups between viewer rebuilds and prefetch requests.
+    final pending = _resolveImageUrl(page);
+    _pendingImageUrls[page] = pending;
+    return pending.whenComplete(() => _pendingImageUrls.remove(page));
+  }
 
-    if (urls[page] == null) {
-      // 40item per page
-      var ppage = page ~/ imagesPerPage;
-      var phtml = await EHSession.requestString(
-        '${pagesUrl[ppage]}&inline_set=ts_m',
-      );
-      var pages = EHParser.getImagesUrl(phtml);
-
-      for (int i = 0; i < pages.length; i++) {
-        urls[ppage * imagesPerPage + i] = pages[i];
+  Future<String> _resolveImageUrl(int page) async {
+    final release = await pageThrottler.acquire();
+    try {
+      if (urls[page] == null) {
+        final galleryPage = page ~/ imagesPerPage;
+        final html = await EHSession.requestString(
+          '${pagesUrl[galleryPage]}&inline_set=ts_m',
+        );
+        final pages = EHParser.getImagesUrl(html);
+        final firstIndex = galleryPage * imagesPerPage;
+        for (var i = 0; i < pages.length && firstIndex + i < count; i++) {
+          urls[firstIndex + i] = pages[i];
+        }
       }
+    } finally {
+      // A failed gallery HTML request must not strand every later page.
+      release.call();
     }
 
-    pageThrottler.release();
-
-    var img = await EHSession.requestString(urls[page]!);
-
+    final imagePageUrl = urls[page];
+    if (imagePageUrl == null) {
+      throw StateError('Could not find ExHentai image page $page');
+    }
+    final html = await EHSession.requestString(imagePageUrl);
     if (Settings.downloadEhRawImage.value) {
-      var unescape = HtmlUnescape();
-      return imgUrls[page] = unescape.convert(
-        EHParser.getOriginalImageAddress(img),
+      return imgUrls[page] = HtmlUnescape().convert(
+        EHParser.getOriginalImageAddress(html),
       );
     }
-    return imgUrls[page] = EHParser.getImageAddress(img);
+    return imgUrls[page] = EHParser.getImageAddress(html);
   }
 
   @override
