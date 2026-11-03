@@ -583,7 +583,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
 
           final oldHeight = c.imgHeight[index];
           if (oldHeight == 0) c.imgHeight[index] = actualHeight;
-          final didChange = oldHeight == 0 && (actualHeight - 300).abs() >= 1;
+          final placeholder = c.estimatedImgHeight[index] > 0
+              ? c.estimatedImgHeight[index]
+              : 300.0;
+          final didChange =
+              oldHeight == 0 && (actualHeight - placeholder).abs() >= 1;
           if (!didChange || _anchorMode) return;
 
           if (_deferDuringScroll && (_onScroll || _scrollEpoch != epoch)) {
