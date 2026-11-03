@@ -7,6 +7,7 @@ import 'package:violet/services/download_archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:violet/component/hentai.dart';
+import 'package:violet/component/downloadable.dart';
 import 'package:flutter/services.dart';
 import 'package:violet/database/query.dart';
 import 'package:violet/database/user/download.dart';
@@ -23,6 +24,7 @@ class GalleryDownloadProgress extends ChangeNotifier {
   int extracted = 0, total = 0, completed = 0;
   double bytes = 0, bytesPerSecond = 0;
   bool cancelled = false;
+  bool streamingExtraction = false;
   DownloadRoutine? routine;
   Future<void>? finished;
 
@@ -146,15 +148,22 @@ class DownloadService {
   void retry(DownloadItemModel item, {bool recover = false}) {
     if (queue.contains(item.id())) return;
     item.result = {...item.result, 'State': 1};
-    _start(item, recover: recover);
+    _start(item, recover: recover, isRetry: true);
     changes.value++;
   }
 
-  void _start(DownloadItemModel item, {bool recover = false}) {
+  void _start(
+    DownloadItemModel item, {
+    bool recover = false,
+    bool isRetry = false,
+  }) {
     if (queue.contains(item.id())) return;
     final job = GalleryDownloadProgress(item);
     _jobs[item.id()] = job;
-    job.finished = queue.submit(item.id(), () => _run(job, recover));
+    job.finished = queue.submit(
+      item.id(),
+      () => _run(job, recover, isRetry),
+    );
     _metadataPending.add(job);
     _pumpMetadata();
     // Failures are stored in the item, so callers do not need to await completion.
@@ -247,7 +256,11 @@ class DownloadService {
     }
   }
 
-  Future<void> _run(GalleryDownloadProgress job, bool recover) async {
+  Future<void> _run(
+    GalleryDownloadProgress job,
+    bool recover,
+    bool isRetry,
+  ) async {
     if (job.cancelled) return;
     final routine = DownloadRoutine(
       job.item,
@@ -275,18 +288,17 @@ class DownloadService {
         await job.item.update();
         await routine.selectExtractor();
       });
-      await routine.createTasks(
-        progressCallback: (current, total) async {
-          job.extracted = current;
-          job.total = total;
-        },
-      );
-      if (job.cancelled) return;
-      if (job.item.state() >= 5) return;
-      if (await routine.checkNothingToDownload()) return;
-      await routine.extractFilePath();
-      job.total = routine.tasks!.length;
-      job.completed = 0;
+      // Fresh downloads overlap address extraction with image downloads.
+      // Explicit Retry preserves full extraction; Recovery uses saved paths.
+      final streamFresh = !recover &&
+          !isRetry &&
+          (job.item.files() == null || job.item.files()!.isEmpty);
+      job.streamingExtraction = streamFresh;
+      final firstDownloads = <Future<void>>[];
+      final downloader = streamFresh
+          ? await IsolateDownloader.getInstance()
+          : null;
+      var startedDownload = false;
 
       void complete() => job.completed++;
       void bytes(double value) => job.bytes += value;
@@ -297,11 +309,66 @@ class DownloadService {
         }
       }
 
-      // Reuse complete files on retry; only missing/invalid pages are submitted.
+      Future<void> enqueueAsExtracted(DownloadTask task) async {
+        if (job.cancelled) return;
+        final path = task.downloadPath!;
+        final existing = File(path);
+        if (await existing.exists() && await existing.length() >= 5) {
+          job.completed++;
+          return;
+        }
+        final finished = Completer<void>();
+        firstDownloads.add(finished.future);
+        task.startCallback = () {};
+        task.sizeCallback = (_) {};
+        task.downloadCallback = bytes;
+        task.completeCallback = () {
+          complete();
+          if (!finished.isCompleted) finished.complete();
+        };
+        task.errorCallback = (message) {
+          error(message);
+          if (!finished.isCompleted) finished.complete();
+        };
+        downloader!.appendTask(task);
+        routine.submittedTaskIds.add(task.taskId);
+        if (!startedDownload) {
+          startedDownload = true;
+          await routine.setDownloading();
+        }
+      }
+
+      await routine.createTasks(
+        recover: recover,
+        onTask: streamFresh ? enqueueAsExtracted : null,
+        progressCallback: (current, total) async {
+          job.extracted = current;
+          job.total = total;
+        },
+      );
+      job.streamingExtraction = false;
+      if (job.cancelled) return;
+      if (job.item.state() >= 5) {
+        if (streamFresh) await Future.wait(firstDownloads);
+        return;
+      }
+      if (await routine.checkNothingToDownload()) return;
+      await routine.extractFilePath();
+      job.total = routine.tasks!.length;
+      if (streamFresh) {
+        // Do not mark a gallery complete before extraction and every
+        // already-submitted image download have both finished.
+        await Future.wait(firstDownloads);
+      } else {
+        job.completed = 0;
+      }
+
+      // Reuse valid files on all paths. Streaming starts downloads during
+      // extraction; Recovery resolves only missing URLs before this check.
       final missing = await routine.checkDownloadFiles();
       if (job.cancelled) return;
       job.completed = job.total - missing.length;
-      if (!recover || missing.isNotEmpty) {
+      if (missing.isNotEmpty) {
         await routine.retryInvalidDownloadFiles(
           missing,
           completeCallback: complete,
