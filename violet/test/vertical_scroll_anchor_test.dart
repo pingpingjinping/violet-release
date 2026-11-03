@@ -42,10 +42,8 @@ void main() {
     );
     expect(anchor, isNull);
   });
-}
 
-
-test('scroll-end anchor uses the currently visible page', () {
+  test('scroll-end anchor uses the currently visible page', () {
   final endPosition = selectScrollEndPage([
     const ItemPosition(
       index: 99,
@@ -92,3 +90,4 @@ test('scroll-end anchor can use a still-loading current page', () {
   ]);
   expect(endPosition?.index, 100);
 });
+}
