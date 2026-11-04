@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
+import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
 import 'package:violet/pages/viewer/viewer_controller.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/settings/settings_wrapper.dart';
@@ -35,6 +36,7 @@ class ProviderImage extends StatefulWidget {
   final int index;
   final ValueChanged<ImageInfo>? onImageReady;
   final ValueListenable<double?>? heldHeight;
+  final double? neighborHeight;
 
   const ProviderImage({
     super.key,
@@ -46,6 +48,7 @@ class ProviderImage extends StatefulWidget {
     required this.index,
     this.onImageReady,
     this.heldHeight,
+    this.neighborHeight,
   });
 
   @override
@@ -64,12 +67,6 @@ class _ProviderImageState extends State<ProviderImage> {
   }
 
   @override
-  void dispose() {
-    clearMemoryImageCache(widget.imgUrl);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final image = ExtendedImage.network(
       widget.imgUrl,
@@ -79,7 +76,9 @@ class _ProviderImageState extends State<ProviderImage> {
       timeRetry: const Duration(milliseconds: 300),
       fit: BoxFit.cover,
       filterQuality: SettingsWrapper.imageQuality,
-      clearMemoryCacheWhenDispose: true,
+      // Let Flutter's bounded LRU image cache retain recently viewed pages.
+      // Evicting on every sliver unmount forces full-image reloads on return.
+      clearMemoryCacheWhenDispose: false,
       clearMemoryCacheIfFailed: true,
       handleLoadingProgress: true,
       loadStateChanged: _loadStateChanged,
@@ -104,6 +103,13 @@ class _ProviderImageState extends State<ProviderImage> {
       },
     );
   }
+
+  double get _placeholderHeight => onlineImagePlaceholderHeight(
+    heldHeight: widget.heldHeight?.value,
+    cachedHeight: c.imgHeight[widget.index],
+    estimatedHeight: c.estimatedImgHeight[widget.index],
+    neighborHeight: widget.neighborHeight,
+  );
 
   Widget _loadStateChanged(ExtendedImageState state) {
     if (state.extendedImageLoadState == LoadState.failed) {
@@ -141,9 +147,7 @@ class _ProviderImageState extends State<ProviderImage> {
             );
 
       return SizedBox(
-        height: c.estimatedImgHeight[widget.index] != 0
-            ? c.estimatedImgHeight[widget.index]
-            : 300,
+        height: _placeholderHeight,
         child: Center(
           child: SizedBox(width: 50, height: 50, child: retryWidget),
         ),
@@ -162,9 +166,7 @@ class _ProviderImageState extends State<ProviderImage> {
       );
     } else if (state.extendedImageLoadState == LoadState.loading) {
       return SizedBox(
-        height: c.estimatedImgHeight[widget.index] != 0
-            ? c.estimatedImgHeight[widget.index]
-            : 300,
+        height: _placeholderHeight,
         child: Center(
           child: SizedBox(
             width: 30,

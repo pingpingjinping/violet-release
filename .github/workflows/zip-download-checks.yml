@@ -5,6 +5,7 @@ on:
       - 'violet/lib/**'
       - 'violet/test/download_archive_test.dart'
       - 'violet/test/vertical_scroll_anchor_test.dart'
+      - 'violet/test/online_image_placeholder_test.dart'
       - '.github/workflows/zip-download-checks.yml'
 permissions:
   contents: read
@@ -50,3 +51,4 @@ jobs:
           test/download_service_test.dart
           test/eh_concurrency_test.dart
           test/vertical_scroll_anchor_test.dart
+          test/online_image_placeholder_test.dart
