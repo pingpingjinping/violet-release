@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:violet/pages/viewer/image/file_image.dart' as file_image;
 import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
+import 'package:violet/pages/viewer/image/online_page_load_error.dart';
 import 'package:violet/pages/viewer/image/provider_image.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/item_positions_listener.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/scrollable_positioned_list.dart';
@@ -557,6 +558,17 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         return FutureBuilder(
           future: c.load(index),
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done &&
+                snapshot.hasError &&
+                (c.urlCache[index] == null || c.headerCache[index] == null)) {
+              return OnlinePageLoadError(
+                height: _visiblePlaceholderHeight(index),
+                onRetry: () {
+                  c.retryPageLoad(index);
+                  if (mounted) setState(() {});
+                },
+              );
+            }
             if (c.urlCache[index] == null || c.headerCache[index] == null) {
               return _loadingWidget(index);
             }
@@ -597,14 +609,16 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     );
   }
 
+  double _visiblePlaceholderHeight(int index) => onlineImagePlaceholderHeight(
+    heldHeight: _heldOnlineImageHeights[index]?.value,
+    cachedHeight: c.imgHeight[index],
+    estimatedHeight: c.estimatedImgHeight[index],
+    neighborHeight: _provisionalHeight(index),
+  );
+
   _loadingWidget(int index) {
     return SizedBox(
-      height: onlineImagePlaceholderHeight(
-        heldHeight: _heldOnlineImageHeights[index]?.value,
-        cachedHeight: c.imgHeight[index],
-        estimatedHeight: c.estimatedImgHeight[index],
-        neighborHeight: _provisionalHeight(index),
-      ),
+      height: _visiblePlaceholderHeight(index),
       child: const Center(
         child: SizedBox(
           width: 30,
