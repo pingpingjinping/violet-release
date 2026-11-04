@@ -9,6 +9,7 @@ import 'package:violet/pages/viewer/image/file_image.dart' as file_image;
 import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
 import 'package:violet/pages/viewer/image/online_page_load_error.dart';
 import 'package:violet/pages/viewer/image/provider_image.dart';
+import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/item_positions_listener.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/scrollable_positioned_list.dart';
 import 'package:violet/pages/viewer/vertical_scroll_anchor.dart';
@@ -53,6 +54,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   final Set<int> _pagesChangedThisFrame = {};
   final Set<int> _pagesChangedDuringScroll = {};
   final Set<int> _measuredOnlineImages = {};
+  Timer? _visibleRecoveryTimer;
+  bool _checkingVisibleRecovery = false;
   // Delays are tied to a page, not to each rebuild of a scrolled list item.
   final Map<int, Future<int>> _providerDisplayDelays = {};
   // Freeze each unseen page's approximation on first encounter. Recomputing
@@ -99,6 +102,15 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           }
         });
 
+    // The list also builds prefetched pages. Check actual viewport geometry,
+    // never all missing URLs or every page in the cache extent.
+    if (c.provider.useProvider) {
+      _visibleRecoveryTimer = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => _recoverVisibleOnlinePage(),
+      );
+    }
+
     _itemPositionsListener.itemPositions.addListener(() {
       if (!c.onSession.value) return;
       if (c.sliderOnChange) return;
@@ -126,6 +138,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
 
   @override
   void dispose() {
+    _visibleRecoveryTimer?.cancel();
     for (final notifier in _heldOnlineImageHeights.values) {
       notifier.dispose();
     }
@@ -188,6 +201,55 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         _touchArea(),
       ],
     );
+  }
+
+  /// Only pages that intersect the *actual* viewport may be recovered.
+  ///
+  /// Normal prefetch and actively progressing image transfers are excluded;
+  /// the pure policy limits every page to two attempts in this viewer session.
+  Future<void> _recoverVisibleOnlinePage() async {
+    if (_checkingVisibleRecovery ||
+        !mounted ||
+        !c.onSession.value ||
+        _onScroll ||
+        c.sliderOnChange ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.paused ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.inactive ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.detached) {
+      return;
+    }
+
+    final visible = _itemPositionsListener.itemPositions.value
+        .where(
+          (position) =>
+              position.index >= 0 &&
+              position.index < c.maxPage &&
+              position.itemTrailingEdge > 0 &&
+              position.itemLeadingEdge < 1,
+        )
+        .map((position) => position.index)
+        .toSet();
+    final retry = c.visiblePageRecovery.candidate(visible, DateTime.now());
+    if (retry == null) return;
+
+    _checkingVisibleRecovery = true;
+    try {
+      if (retry.type == VisiblePageRetryType.metadata) {
+        c.visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
+        c.retryPageLoad(retry.index);
+        if (mounted) setState(() {});
+      } else if (!c.isRefreshingImages && c.urlCache[retry.index] != null) {
+        c.visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
+        await c.retryVisibleImage(retry.index);
+      }
+    } catch (error) {
+      // A failed automatic attempt never starts an unbounded retry loop.
+      // The existing purple button remains available for manual recovery.
+      debugPrint('[viewer-visible-recovery] Retry failed: $error');
+    } finally {
+      _checkingVisibleRecovery = false;
+    }
   }
 
   Widget _itemBuild(BuildContext context, int index) {
