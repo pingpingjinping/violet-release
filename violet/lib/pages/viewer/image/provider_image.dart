@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
 import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
+import 'package:violet/pages/viewer/image/online_image_retry_policy.dart';
 import 'package:violet/pages/viewer/viewer_controller.dart';
 import 'package:violet/settings/settings.dart';
 import 'package:violet/settings/settings_wrapper.dart';
@@ -68,12 +69,13 @@ class _ProviderImageState extends State<ProviderImage> {
 
   @override
   Widget build(BuildContext context) {
+    final retryPolicy = onlineImageRetryPolicy(c.provider.provider);
     final image = ExtendedImage.network(
       widget.imgUrl,
       key: widget.imgKey,
       headers: widget.imgHeader,
-      retries: 2,
-      timeRetry: const Duration(milliseconds: 300),
+      retries: retryPolicy.retries,
+      timeRetry: retryPolicy.interval,
       fit: BoxFit.cover,
       filterQuality: SettingsWrapper.imageQuality,
       // Let Flutter's bounded LRU image cache retain recently viewed pages.
