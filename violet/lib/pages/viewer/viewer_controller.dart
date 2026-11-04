@@ -13,6 +13,7 @@ import 'package:violet/component/hitomi/message_search.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
 import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
+import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 import 'package:violet/pages/viewer/others/preload_page_view.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:violet/pages/viewer/viewer_page_provider.dart';
@@ -85,6 +86,8 @@ class ViewerController extends GetxController {
   bool _refreshingFailedImages = false;
   // Actual image download failures, not pages still loading or resolving URLs.
   final failedOnlineImages = OnlineImageFailureTracker();
+  final visiblePageRecovery = VisibleOnlinePageRecovery();
+  bool get isRefreshingImages => _refreshingFailedImages;
 
   /// these are used on overlay
   var overlay = false.obs;
@@ -223,7 +226,18 @@ class ViewerController extends GetxController {
     if (!provider.useProvider || index < 0 || index >= maxPage) {
       return Future<void>.value();
     }
-    return _pageLoads.load(index, () => _loadPage(index));
+    return _pageLoads.load(index, () async {
+      visiblePageRecovery.metadataLoading(index, DateTime.now());
+      try {
+        await _loadPage(index);
+        visiblePageRecovery.metadataReady(index);
+      } catch (_) {
+        // The coordinator performs its bounded retries. Only terminal errors
+        // remain in FutureBuilder; recovery never acts on off-screen pages.
+        visiblePageRecovery.metadataFailed(index, DateTime.now());
+        rethrow;
+      }
+    });
   }
 
   /// A stable future for horizontally displayed two-page spreads.
@@ -332,6 +346,50 @@ class ViewerController extends GetxController {
     messageIndex.value = 1;
 
     gotoSearchIndex();
+  }
+
+  /// Automatic recovery affects ONLY the visible page. Unlike the manual
+  /// purple action, it must not refresh the whole gallery or other pages.
+  /// Returns false when another refresh is running or the URL is unknown.
+  Future<bool> retryVisibleImage(int index) async {
+    if (_refreshingFailedImages ||
+        !provider.useProvider ||
+        provider.provider == null ||
+        index < 0 ||
+        index >= maxPage ||
+        urlCache[index] == null) {
+      return false;
+    }
+
+    _refreshingFailedImages = true;
+    try {
+      final oldUrl = urlCache[index]!.value;
+      try {
+        final header = await provider.provider!.getHeader(index);
+        final url = await provider.provider!.getImageUrl(index);
+        if (url.trim().isEmpty) throw StateError('Empty URL at page $index');
+        headerCache[index] = header;
+        await CachedNetworkImage.evictFromCache(oldUrl);
+        imgKeys[index] = GlobalKey();
+        if (urlCache[index]!.value == url) {
+          urlCache[index]!.refresh();
+        } else {
+          urlCache[index]!.value = url;
+        }
+      } catch (error, stackTrace) {
+        Logger.warning(
+          '[viewer-visible-recovery] Page $index: $error\\n$stackTrace',
+        );
+        // A transient URL lookup error should not prevent one retry of the
+        // previous URL. Re-key even when the image address has not changed.
+        await CachedNetworkImage.evictFromCache(oldUrl);
+        imgKeys[index] = GlobalKey();
+        urlCache[index]!.refresh();
+      }
+    } finally {
+      _refreshingFailedImages = false;
+    }
+    return true;
   }
 
   /// The purple refresh button retries ALL confirmed image failures.
