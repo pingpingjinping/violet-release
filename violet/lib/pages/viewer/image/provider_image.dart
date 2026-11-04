@@ -3,6 +3,7 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:violet/log/log.dart';
@@ -32,6 +33,8 @@ class ProviderImage extends StatefulWidget {
   final Map<String, String>? imgHeader;
   final VImageWidgetBuilder imageWidgetBuilder;
   final int index;
+  final ValueChanged<ImageInfo>? onImageReady;
+  final ValueListenable<double?>? heldHeight;
 
   const ProviderImage({
     super.key,
@@ -41,6 +44,8 @@ class ProviderImage extends StatefulWidget {
     required this.imgHeader,
     required this.imageWidgetBuilder,
     required this.index,
+    this.onImageReady,
+    this.heldHeight,
   });
 
   @override
@@ -151,7 +156,10 @@ class _ProviderImageState extends State<ProviderImage> {
         !_loaded) {
       _loaded = true;
       c.isImageLoaded[widget.index] = true;
-      return widget.imageWidgetBuilder(context, state.completedWidget);
+      if (imageInfo != null) widget.onImageReady?.call(imageInfo);
+      return _wrapCompleted(
+        widget.imageWidgetBuilder(context, state.completedWidget),
+      );
     } else if (state.extendedImageLoadState == LoadState.loading) {
       return SizedBox(
         height: c.estimatedImgHeight[widget.index] != 0
@@ -174,6 +182,21 @@ class _ProviderImageState extends State<ProviderImage> {
 
     c.isImageLoaded[widget.index] = true;
 
-    return state.completedWidget;
+    // ExtendedImage may rebuild after the first completion. Keep the fixed
+    // height wrapper until scrolling fully ends, including on later frames.
+    return _wrapCompleted(state.completedWidget);
+  }
+
+  Widget _wrapCompleted(Widget child) {
+    final heldHeight = widget.heldHeight;
+    if (heldHeight == null) return child;
+    return ValueListenableBuilder<double?>(
+      valueListenable: heldHeight,
+      builder: (context, height, image) {
+        if (height == null) return image!;
+        return SizedBox(height: height, child: image);
+      },
+      child: child,
+    );
   }
 }

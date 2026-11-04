@@ -92,4 +92,17 @@ void main() {
     ]);
     expect(endPosition?.index, 100);
   });
+  test('intrinsic image dimensions provide stable height before layout', () {
+    expect(
+      realHeightFromImage(width: 390, imageWidth: 780, imageHeight: 1560),
+      778,
+    );
+  });
+
+  test('invalid intrinsic image dimensions are ignored', () {
+    expect(
+      realHeightFromImage(width: 390, imageWidth: 0, imageHeight: 900),
+      isNull,
+    );
+  });
 }
