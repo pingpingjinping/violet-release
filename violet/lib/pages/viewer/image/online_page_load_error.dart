@@ -17,10 +17,7 @@ class OnlinePageLoadError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              '이미지를 불러오지 못했습니다',
-              textAlign: TextAlign.center,
-            ),
+            const Text('이미지를 불러오지 못했습니다', textAlign: TextAlign.center),
             TextButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),

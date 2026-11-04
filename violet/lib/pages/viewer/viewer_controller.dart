@@ -225,12 +225,9 @@ class ViewerController extends GetxController {
 
   /// A stable future for horizontally displayed two-page spreads.
   Future<void> loadPair(int first, int second) =>
-      _pairedPageLoads.putIfAbsent(
-        (first, second),
-        () async {
-          await Future.wait([load(first), load(second)]);
-        },
-      );
+      _pairedPageLoads.putIfAbsent((first, second), () async {
+        await Future.wait([load(first), load(second)]);
+      });
 
   /// Retrying the failed page must not invalidate other visible page caches.
   void retryPageLoad(int index) {
