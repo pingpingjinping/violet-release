@@ -78,7 +78,10 @@ jobs:
               | grep -E '^violet/.*[.]dart$' | cut -c8- || true
           )
           if [ "${#files[@]}" -gt 0 ]; then
-            dart format --output=none --set-exit-if-changed "${files[@]}"
+            dart format --output=write "${files[@]}"
+            echo '=== DART FORMAT DIFF ==='
+            git diff -- "${files[@]}"
+            git diff --exit-code -- "${files[@]}"
           else
             echo "No Dart files changed in this PR."
           fi
