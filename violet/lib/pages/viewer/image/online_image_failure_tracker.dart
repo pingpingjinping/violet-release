@@ -9,9 +9,13 @@ class OnlineImageFailureTracker {
     if (index >= 0) _failed.add(index);
   }
 
-  void markLoading(int index) => _failed.remove(index);
+  void markLoading(int index) {
+    _failed.remove(index);
+  }
 
-  void markLoaded(int index) => _failed.remove(index);
+  void markLoaded(int index) {
+    _failed.remove(index);
+  }
 
   List<int> retryablePages({
     required int pageCount,
