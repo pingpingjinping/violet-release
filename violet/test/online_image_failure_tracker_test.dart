@@ -9,10 +9,7 @@ void main() {
     tracker.markLoading(3); // A previously failed page is now downloading.
     tracker.markLoaded(4);
 
-    expect(
-      tracker.retryablePages(pageCount: 6, hasUrl: (_) => true),
-      [2],
-    );
+    expect(tracker.retryablePages(pageCount: 6, hasUrl: (_) => true), [2]);
   });
 
   test('purple retry includes all failed pages with resolved URLs', () {
@@ -22,10 +19,7 @@ void main() {
     tracker.markFailed(7);
 
     expect(
-      tracker.retryablePages(
-        pageCount: 8,
-        hasUrl: (index) => index != 4,
-      ),
+      tracker.retryablePages(pageCount: 8, hasUrl: (index) => index != 4),
       [1, 7],
     );
   });
@@ -37,16 +31,10 @@ void main() {
     tracker.markLoading(1);
     tracker.markLoaded(2);
 
-    expect(
-      tracker.retryablePages(pageCount: 3, hasUrl: (_) => true),
-      isEmpty,
-    );
+    expect(tracker.retryablePages(pageCount: 3, hasUrl: (_) => true), isEmpty);
 
     tracker.markFailed(1);
-    expect(
-      tracker.retryablePages(pageCount: 3, hasUrl: (_) => true),
-      [1],
-    );
+    expect(tracker.retryablePages(pageCount: 3, hasUrl: (_) => true), [1]);
   });
 
   test('other pages remain failed until their own state changes', () {
@@ -55,9 +43,6 @@ void main() {
     tracker.markFailed(3);
     tracker.markLoaded(1);
 
-    expect(
-      tracker.retryablePages(pageCount: 5, hasUrl: (_) => true),
-      [3],
-    );
+    expect(tracker.retryablePages(pageCount: 5, hasUrl: (_) => true), [3]);
   });
 }
