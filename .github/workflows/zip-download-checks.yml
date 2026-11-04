@@ -47,6 +47,8 @@ jobs:
           lib/pages/viewer/overlay/viewer_gallery.dart
           lib/pages/viewer/overlay/viewer_overlay.dart
           test/download_archive_test.dart
+      - name: Diagnostic formatted output
+        run: dart format --output=show test/online_viewer_tap_routing_test.dart
       - name: Verify ZIP, download queue and scroll anchoring
         run: >-
           flutter test
