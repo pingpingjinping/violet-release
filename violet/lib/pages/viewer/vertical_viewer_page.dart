@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:violet/pages/viewer/image/file_image.dart' as file_image;
+import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
 import 'package:violet/pages/viewer/image/provider_image.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/item_positions_listener.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/src/scrollable_positioned_list.dart';
@@ -587,9 +588,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
 
   _loadingWidget(int index) {
     return SizedBox(
-      height: c.estimatedImgHeight[index] != 0
-          ? c.estimatedImgHeight[index]
-          : 300,
+      height: onlineImagePlaceholderHeight(
+        heldHeight: _heldOnlineImageHeights[index]?.value,
+        cachedHeight: c.imgHeight[index],
+        estimatedHeight: c.estimatedImgHeight[index],
+      ),
       child: const Center(
         child: SizedBox(
           width: 30,

@@ -1,0 +1,43 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:violet/pages/viewer/image/online_image_placeholder.dart';
+
+void main() {
+  test('known page height survives network image remount', () {
+    expect(
+      onlineImagePlaceholderHeight(
+        cachedHeight: 1800,
+        estimatedHeight: 300,
+      ),
+      1800,
+    );
+  });
+
+  test('held scrolling height wins until the gesture ends', () {
+    expect(
+      onlineImagePlaceholderHeight(
+        heldHeight: 300,
+        cachedHeight: 1800,
+        estimatedHeight: 1000,
+      ),
+      300,
+    );
+  });
+
+  test('estimate is used before any real image height is available', () {
+    expect(
+      onlineImagePlaceholderHeight(cachedHeight: 0, estimatedHeight: 1250),
+      1250,
+    );
+  });
+
+  test('invalid heights fall back to a finite placeholder', () {
+    expect(
+      onlineImagePlaceholderHeight(
+        heldHeight: double.nan,
+        cachedHeight: double.infinity,
+        estimatedHeight: -1,
+      ),
+      300,
+    );
+  });
+}
