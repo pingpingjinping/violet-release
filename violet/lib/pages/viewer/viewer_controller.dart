@@ -334,7 +334,7 @@ class ViewerController extends GetxController {
     gotoSearchIndex();
   }
 
-  Future<void> refreshFailedImages() async {
+  Future<void> refreshFailedImages({int? onlyIndex}) async {
     if (_refreshingFailedImages ||
         !provider.useProvider ||
         provider.provider == null) {
@@ -343,7 +343,10 @@ class ViewerController extends GetxController {
 
     final failedPages = <int>[
       for (var i = 0; i < isImageLoaded.length; i++)
-        if (!isImageLoaded[i] && urlCache[i] != null) i,
+        if (!isImageLoaded[i] &&
+            urlCache[i] != null &&
+            (onlyIndex == null || i == onlyIndex))
+          i,
     ];
     if (failedPages.isEmpty) return;
 
