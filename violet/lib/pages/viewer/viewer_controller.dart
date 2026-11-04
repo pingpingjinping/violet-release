@@ -11,6 +11,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:violet/component/hitomi/message_search.dart';
 import 'package:violet/log/log.dart';
+import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
 import 'package:violet/pages/viewer/others/preload_page_view.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:violet/pages/viewer/viewer_page_provider.dart';
@@ -104,7 +105,10 @@ class ViewerController extends GetxController {
   /// image infos
   late RxList<bool> isImageLoaded;
   late List<RxString?> urlCache;
-  final Map<int, Future<void>> _pendingPageLoads = {};
+  // Retain completed/failed requests across rebuilds so failures do not
+  // restart in an unbounded loop or leave a permanent loading indicator.
+  final _pageLoads = OnlinePageLoadCoordinator();
+  final Map<(int, int), Future<void>> _pairedPageLoads = {};
   late List<Map<String, String>?> headerCache;
   late List<double> imgHeight;
   late List<double> estimatedImgHeight;
@@ -216,11 +220,23 @@ class ViewerController extends GetxController {
     if (!provider.useProvider || index < 0 || index >= maxPage) {
       return Future<void>.value();
     }
-    final pending = _pendingPageLoads[index];
-    if (pending != null) return pending;
-    final current = _loadPage(index);
-    _pendingPageLoads[index] = current;
-    return current.whenComplete(() => _pendingPageLoads.remove(index));
+    return _pageLoads.load(index, () => _loadPage(index));
+  }
+
+  /// A stable future for horizontally displayed two-page spreads.
+  Future<void> loadPair(int first, int second) =>
+      _pairedPageLoads.putIfAbsent(
+        (first, second),
+        () async {
+          await Future.wait([load(first), load(second)]);
+        },
+      );
+
+  /// Retrying the failed page must not invalidate other visible page caches.
+  void retryPageLoad(int index) {
+    if (index < 0 || index >= maxPage) return;
+    _pageLoads.reset(index);
+    _pairedPageLoads.clear();
   }
 
   Future<void> _loadPage(int index) async {
@@ -229,6 +245,9 @@ class ViewerController extends GetxController {
     }
     if (urlCache[index] == null) {
       final url = await provider.provider!.getImageUrl(index);
+      if (url.trim().isEmpty) {
+        throw StateError('Image URL is empty for page $index');
+      }
       urlCache[index] = RxString(url);
     }
   }

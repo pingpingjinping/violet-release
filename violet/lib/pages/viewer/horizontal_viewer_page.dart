@@ -10,6 +10,7 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
 import 'package:violet/pages/viewer/image/image_crop_bookmark.dart';
+import 'package:violet/pages/viewer/image/online_page_load_error.dart';
 import 'package:violet/pages/viewer/others/photo_view_gallery.dart';
 import 'package:violet/pages/viewer/viewer_controller.dart';
 import 'package:violet/pages/viewer/widget/tap_litstener.dart';
@@ -320,10 +321,7 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
 
       viewWidget = FutureBuilder(
         future: c.onTwoPage.value
-            ? Future.wait([
-                c.load(index * 2 - indexPad),
-                c.load(index * 2 + 1 - indexPad),
-              ])
+            ? c.loadPair(index * 2 - indexPad, index * 2 + 1 - indexPad)
             : c.load(index),
         builder: (context, snapshot) {
           var twoPageLoaded = true;
@@ -345,6 +343,27 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
           final checkLoad = c.onTwoPage.value
               ? twoPageLoaded
               : c.urlCache[index] != null && c.headerCache[index] != null;
+
+          if (snapshot.connectionState == ConnectionState.done &&
+              snapshot.hasError &&
+              !checkLoad) {
+            final failedIndices = c.onTwoPage.value
+                ? [index * 2 - indexPad, index * 2 + 1 - indexPad]
+                : [index];
+            return OnlinePageLoadError(
+              onRetry: () {
+                for (final failed in failedIndices) {
+                  if (failed >= 0 &&
+                      failed < c.maxPage &&
+                      (c.urlCache[failed] == null ||
+                          c.headerCache[failed] == null)) {
+                    c.retryPageLoad(failed);
+                  }
+                }
+                if (mounted) setState(() {});
+              },
+            );
+          }
 
           if (checkLoad) {
             if (c.onTwoPage.value) {
