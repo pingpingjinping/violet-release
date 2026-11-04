@@ -8,6 +8,7 @@ on:
       - 'violet/test/online_image_placeholder_test.dart'
       - 'violet/test/online_page_load_coordinator_test.dart'
       - 'violet/test/online_image_failure_tracker_test.dart'
+      - 'violet/test/online_viewer_tap_routing_test.dart'
       - 'violet/test/visible_online_page_recovery_test.dart'
       - '.github/workflows/zip-download-checks.yml'
 permissions:
@@ -57,4 +58,5 @@ jobs:
           test/online_image_placeholder_test.dart
           test/online_page_load_coordinator_test.dart
           test/online_image_failure_tracker_test.dart
+          test/online_viewer_tap_routing_test.dart
           test/visible_online_page_recovery_test.dart

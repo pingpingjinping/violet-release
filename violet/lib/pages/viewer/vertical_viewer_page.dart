@@ -183,23 +183,25 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       },
     );
 
-    return Stack(
-      children: [
-        InteractiveViewer(
-          transformationController: _transformationController,
-          minScale: 1.0,
-          child: AbsorbPointer(
-            absorbing: !_scrollListEnable,
-            child: ColoredBox(
-              color: Settings.themeWhat.value && Settings.themeBlack.value
-                  ? Colors.black
-                  : const Color(0xff444444),
-              child: notificationListener,
-            ),
+    // Listen for page taps *around* the viewer. A full-screen overlay in
+    // front of it prevents the failed image's refresh IconButton from being
+    // hit-tested, so a visible purple retry button cannot be pressed.
+    return CustomDoubleTapGestureDectector(
+      onTap: _touchEvent,
+      onDoubleTap: _doubleTapEvent,
+      child: InteractiveViewer(
+        transformationController: _transformationController,
+        minScale: 1.0,
+        child: AbsorbPointer(
+          absorbing: !_scrollListEnable,
+          child: ColoredBox(
+            color: Settings.themeWhat.value && Settings.themeBlack.value
+                ? Colors.black
+                : const Color(0xff444444),
+            child: notificationListener,
           ),
         ),
-        _touchArea(),
-      ],
+      ),
     );
   }
 
@@ -283,20 +285,6 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           _scrollListEnable = value;
         });
       },
-    );
-  }
-
-  _touchArea() {
-    final height = MediaQuery.of(context).size.height;
-    final width = MediaQuery.of(context).size.width;
-    return Container(
-      color: null,
-      width: width,
-      height: height,
-      child: CustomDoubleTapGestureDectector(
-        onTap: _touchEvent,
-        onDoubleTap: _doubleTapEvent,
-      ),
     );
   }
 
