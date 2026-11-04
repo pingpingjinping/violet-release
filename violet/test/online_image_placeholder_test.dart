@@ -30,6 +30,30 @@ void main() {
     );
   });
 
+  test('unseen page uses nearby known heights when available', () {
+    final known = [0.0, 900.0, 0.0, 1100.0, 1200.0, 0.0];
+    expect(nearestKnownImageHeight(heights: known, index: 2), 1100);
+    expect(
+      onlineImagePlaceholderHeight(
+        cachedHeight: 0,
+        estimatedHeight: 0,
+        neighborHeight: 1100,
+      ),
+      1100,
+    );
+  });
+
+  test('no known neighboring pages leaves the normal 300px fallback', () {
+    expect(nearestKnownImageHeight(heights: [0, 0, 0], index: 1), isNull);
+    expect(
+      onlineImagePlaceholderHeight(
+        cachedHeight: 0,
+        estimatedHeight: 0,
+      ),
+      300,
+    );
+  });
+
   test('invalid heights fall back to a finite placeholder', () {
     expect(
       onlineImagePlaceholderHeight(

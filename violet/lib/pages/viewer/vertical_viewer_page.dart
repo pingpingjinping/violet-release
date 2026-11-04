@@ -54,6 +54,16 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   final Set<int> _measuredOnlineImages = {};
   // Delays are tied to a page, not to each rebuild of a scrolled list item.
   final Map<int, Future<int>> _providerDisplayDelays = {};
+  // Freeze each unseen page's approximation on first encounter. Recomputing
+  // it as neighboring images load would itself cause scroll relayout jitter.
+  final Map<int, double> _onlinePlaceholderEstimates = {};
+
+  double _provisionalHeight(int index) => _onlinePlaceholderEstimates
+      .putIfAbsent(
+        index,
+        () =>
+            nearestKnownImageHeight(heights: c.imgHeight, index: index) ?? 300,
+      );
   final Map<int, ValueNotifier<double?>> _heldOnlineImageHeights = {};
   final Map<int, (double, double)> _pendingOnlineEstimates = {};
   bool _releaseOnlineHeightsQueued = false;
@@ -389,7 +399,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           ? old
           : c.estimatedImgHeight[index] > 0
           ? c.estimatedImgHeight[index]
-          : 300.0;
+          : _provisionalHeight(index);
       final holder = _imageHold(index);
       // The callback runs before the completed widget is built, so the
       // ValueListenableBuilder first mounts with this fixed placeholder.
@@ -565,6 +575,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
                     ? (info) => _onOnlineImageReady(index, info, width)
                     : null,
                 heldHeight: _stabilizeOnlineLayout ? _imageHold(index) : null,
+                neighborHeight: _provisionalHeight(index),
               ),
             );
 
@@ -592,6 +603,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         heldHeight: _heldOnlineImageHeights[index]?.value,
         cachedHeight: c.imgHeight[index],
         estimatedHeight: c.estimatedImgHeight[index],
+        neighborHeight: _provisionalHeight(index),
       ),
       child: const Center(
         child: SizedBox(

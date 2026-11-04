@@ -36,6 +36,7 @@ class ProviderImage extends StatefulWidget {
   final int index;
   final ValueChanged<ImageInfo>? onImageReady;
   final ValueListenable<double?>? heldHeight;
+  final double? neighborHeight;
 
   const ProviderImage({
     super.key,
@@ -47,6 +48,7 @@ class ProviderImage extends StatefulWidget {
     required this.index,
     this.onImageReady,
     this.heldHeight,
+    this.neighborHeight,
   });
 
   @override
@@ -106,6 +108,7 @@ class _ProviderImageState extends State<ProviderImage> {
     heldHeight: widget.heldHeight?.value,
     cachedHeight: c.imgHeight[widget.index],
     estimatedHeight: c.estimatedImgHeight[widget.index],
+    neighborHeight: widget.neighborHeight,
   );
 
   Widget _loadStateChanged(ExtendedImageState state) {
