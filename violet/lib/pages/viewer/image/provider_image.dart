@@ -118,6 +118,7 @@ class _ProviderImageState extends State<ProviderImage> {
       );
       _loaded = false;
       c.isImageLoaded[widget.index] = false;
+      c.failedOnlineImages.markFailed(widget.index);
 
       final retryWidget = _refreshing
           ? const SizedBox(
@@ -135,7 +136,7 @@ class _ProviderImageState extends State<ProviderImage> {
                 });
 
                 try {
-                  await c.refreshFailedImages(onlyIndex: widget.index);
+                  await c.refreshFailedImages();
                 } finally {
                   if (mounted) {
                     setState(() {
@@ -160,11 +161,13 @@ class _ProviderImageState extends State<ProviderImage> {
         !_loaded) {
       _loaded = true;
       c.isImageLoaded[widget.index] = true;
+      c.failedOnlineImages.markLoaded(widget.index);
       if (imageInfo != null) widget.onImageReady?.call(imageInfo);
       return _wrapCompleted(
         widget.imageWidgetBuilder(context, state.completedWidget),
       );
     } else if (state.extendedImageLoadState == LoadState.loading) {
+      c.failedOnlineImages.markLoading(widget.index);
       return SizedBox(
         height: _placeholderHeight,
         child: Center(
@@ -183,6 +186,7 @@ class _ProviderImageState extends State<ProviderImage> {
     }
 
     c.isImageLoaded[widget.index] = true;
+    c.failedOnlineImages.markLoaded(widget.index);
 
     // ExtendedImage may rebuild after the first completion. Keep the fixed
     // height wrapper until scrolling fully ends, including on later frames.

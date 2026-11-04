@@ -11,6 +11,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
 import 'package:violet/component/hitomi/message_search.dart';
 import 'package:violet/log/log.dart';
+import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
 import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
 import 'package:violet/pages/viewer/others/preload_page_view.dart';
 import 'package:violet/pages/viewer/others/scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -82,6 +83,8 @@ class ViewerController extends GetxController {
   var isStaring = true;
   var sliderOnChange = false;
   bool _refreshingFailedImages = false;
+  // Actual image download failures, not pages still loading or resolving URLs.
+  final failedOnlineImages = OnlineImageFailureTracker();
 
   /// these are used on overlay
   var overlay = false.obs;
@@ -331,20 +334,19 @@ class ViewerController extends GetxController {
     gotoSearchIndex();
   }
 
-  Future<void> refreshFailedImages({int? onlyIndex}) async {
+  /// The purple refresh button retries ALL confirmed image failures.
+  /// Image downloads still in progress must never be restarted by this action.
+  Future<void> refreshFailedImages() async {
     if (_refreshingFailedImages ||
         !provider.useProvider ||
         provider.provider == null) {
       return;
     }
 
-    final failedPages = <int>[
-      for (var i = 0; i < isImageLoaded.length; i++)
-        if (!isImageLoaded[i] &&
-            urlCache[i] != null &&
-            (onlyIndex == null || i == onlyIndex))
-          i,
-    ];
+    final failedPages = failedOnlineImages.retryablePages(
+      pageCount: maxPage,
+      hasUrl: (index) => urlCache[index] != null,
+    );
     if (failedPages.isEmpty) return;
 
     _refreshingFailedImages = true;
