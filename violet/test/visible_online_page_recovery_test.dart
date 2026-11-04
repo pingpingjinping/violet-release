@@ -69,20 +69,14 @@ void main() {
     final second = state.candidate([6], secondAt)!;
     state.beginAutomaticRetry(second, secondAt);
     state.imageFailed(6, start.add(const Duration(seconds: 27)));
-    expect(
-      state.candidate([6], start.add(const Duration(minutes: 5))),
-      isNull,
-    );
+    expect(state.candidate([6], start.add(const Duration(minutes: 5))), isNull);
     expect(state.automaticAttempts(6), 2);
 
     state.imageLoaded(6);
     state.imageFailed(6, start.add(const Duration(minutes: 6)));
     expect(state.automaticAttempts(6), 0);
     expect(
-      state.candidate(
-        [6],
-        start.add(const Duration(minutes: 6, seconds: 6)),
-      ),
+      state.candidate([6], start.add(const Duration(minutes: 6, seconds: 6))),
       isNotNull,
     );
   });
