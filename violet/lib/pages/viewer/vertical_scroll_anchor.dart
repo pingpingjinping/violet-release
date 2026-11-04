@@ -52,7 +52,6 @@ ItemPosition? selectScrollEndPage(Iterable<ItemPosition> positions) {
   return best;
 }
 
-
 /// Scale the intrinsic image size to the available display width, using the
 /// same 1.5 px safety inset as the legacy viewer's measured height.
 double? realHeightFromImage({

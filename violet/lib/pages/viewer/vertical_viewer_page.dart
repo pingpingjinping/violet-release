@@ -57,14 +57,10 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   final Map<int, (double, double)> _pendingOnlineEstimates = {};
   bool _releaseOnlineHeightsQueued = false;
 
-  bool get _stabilizeOnlineLayout =>
-      _anchorMode || _deferDuringScroll;
+  bool get _stabilizeOnlineLayout => _anchorMode || _deferDuringScroll;
 
-  ValueNotifier<double?> _imageHold(int index) =>
-      _heldOnlineImageHeights.putIfAbsent(
-        index,
-        () => ValueNotifier<double?>(null),
-      );
+  ValueNotifier<double?> _imageHold(int index) => _heldOnlineImageHeights
+      .putIfAbsent(index, () => ValueNotifier<double?>(null));
 
   bool get _deferDuringScroll =>
       c.provider.useProvider &&
@@ -362,9 +358,11 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           }
         }
         if (same == null) return;
-        final delta = (same.itemLeadingEdge - anchorStart) *
+        final delta =
+            (same.itemLeadingEdge - anchorStart) *
             MediaQuery.of(context).size.height;
-        if (!delta.isFinite || delta.abs() < 1 ||
+        if (!delta.isFinite ||
+            delta.abs() < 1 ||
             delta.abs() > MediaQuery.of(context).size.height * 2) {
           return;
         }
@@ -389,8 +387,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
       final placeholder = old > 0
           ? old
           : c.estimatedImgHeight[index] > 0
-              ? c.estimatedImgHeight[index]
-              : 300.0;
+          ? c.estimatedImgHeight[index]
+          : 300.0;
       final holder = _imageHold(index);
       // The callback runs before the completed widget is built, so the
       // ValueListenableBuilder first mounts with this fixed placeholder.
@@ -532,10 +530,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     // build resets FutureBuilder to its spinner even for the same page.
     final Future<int> future = _providerDisplayDelays.putIfAbsent(
       index,
-      () => Future<int>.delayed(
-        const Duration(milliseconds: 300),
-        () => 1,
-      ),
+      () => Future<int>.delayed(const Duration(milliseconds: 300), () => 1),
     );
 
     return FutureBuilder(
