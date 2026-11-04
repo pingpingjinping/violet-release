@@ -58,8 +58,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   // it as neighboring images load would itself cause scroll relayout jitter.
   final Map<int, double> _onlinePlaceholderEstimates = {};
 
-  double _provisionalHeight(int index) => _onlinePlaceholderEstimates
-      .putIfAbsent(
+  double _provisionalHeight(int index) =>
+      _onlinePlaceholderEstimates.putIfAbsent(
         index,
         () =>
             nearestKnownImageHeight(heights: c.imgHeight, index: index) ?? 300,

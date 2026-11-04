@@ -15,9 +15,7 @@ double onlineImagePlaceholderHeight({
   if (estimatedHeight.isFinite && estimatedHeight > 0) {
     return estimatedHeight;
   }
-  if (neighborHeight != null &&
-      neighborHeight.isFinite &&
-      neighborHeight > 0) {
+  if (neighborHeight != null && neighborHeight.isFinite && neighborHeight > 0) {
     return neighborHeight;
   }
   return fallbackHeight;
@@ -32,8 +30,8 @@ double? nearestKnownImageHeight({
   int maxDistance = 5,
   int maxSamples = 4,
 }) {
-  if (index < 0 || index >= heights.length ||
-      maxDistance < 1 || maxSamples < 1) return null;
+  if (index < 0 || index >= heights.length || maxDistance < 1 || maxSamples < 1)
+    return null;
   final samples = <double>[];
   for (var d = 1; d <= maxDistance && samples.length < maxSamples; d++) {
     for (final i in [index - d, index + d]) {
