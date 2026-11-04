@@ -135,7 +135,7 @@ class _ProviderImageState extends State<ProviderImage> {
                 });
 
                 try {
-                  await c.refreshFailedImages();
+                  await c.refreshFailedImages(onlyIndex: widget.index);
                 } finally {
                   if (mounted) {
                     setState(() {
