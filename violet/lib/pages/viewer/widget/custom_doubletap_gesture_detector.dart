@@ -12,11 +12,13 @@ class CustomDoubleTapGestureDectector extends StatefulWidget {
   final GestureTapDownCallback onTap;
   final GestureTapDownCallback onDoubleTap;
   final Duration doubleTapMaxDelay;
+  final Widget? child;
 
   const CustomDoubleTapGestureDectector({
     super.key,
     required this.onTap,
     required this.onDoubleTap,
+    this.child,
     // ignore: unused_element
     this.doubleTapMaxDelay = const Duration(milliseconds: 200),
   });
@@ -62,6 +64,7 @@ class _CustomDoubleTapGestureDectectorState
           _doubleTapCheckTimer!.cancel();
         }
       },
+      child: widget.child,
     );
   }
 
