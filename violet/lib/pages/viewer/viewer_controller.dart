@@ -426,8 +426,7 @@ class ViewerController extends GetxController {
       Logger.warning('[viewer-image-retry] Prefetch cache eviction: $error');
     }
     if (!canRetry()) return;
-    final imageState = imgKeys[index].currentState;
-    if (imageState is ExtendedImageState) {
+    if (imgKeys[index].currentState case final ExtendedImageState imageState) {
       // A same-URL reload must not rejoin a stalled ExtendedImage stream.
       await imageState.imageProvider.evict();
     }
