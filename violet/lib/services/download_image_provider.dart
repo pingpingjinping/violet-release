@@ -1,6 +1,3 @@
-import 'dart:isolate';
-import 'package:image_size_getter/file_input.dart';
-import 'package:image_size_getter/image_size_getter.dart' as dimensions;
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -33,19 +30,5 @@ class DownloadImageProvider extends ExtendedFileImageProvider {
   }
 }
 
-// Top-level worker avoids capturing a Flutter State in an isolate closure.
 Future<List<(int, int)?>> downloadImageSizes(List<String> sources) =>
-    Isolate.run(
-      () => sources.map((source) {
-        try {
-          final size = DownloadArchive.isEntry(source)
-              ? dimensions.ImageSizeGetter.getSize(
-                  dimensions.MemoryInput(DownloadArchive.readSync(source)),
-                )
-              : dimensions.ImageSizeGetter.getSize(FileInput(File(source)));
-          return (size.width, size.height);
-        } catch (_) {
-          return null;
-        }
-      }).toList(),
-    );
+    DownloadArchive.imageSizes(sources);

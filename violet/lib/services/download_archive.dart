@@ -4,6 +4,8 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'package:image_size_getter/file_input.dart';
+import 'package:image_size_getter/image_size_getter.dart' as dimensions;
 import 'package:path/path.dart' as p;
 
 /// A ZIP page reference is metadata only: no extracted file is created.
@@ -179,17 +181,83 @@ class DownloadArchive {
     final input = InputFileStream(backingFile(source));
     try {
       final archive = ZipDecoder().decodeStream(input);
-      final file = archive.find(entryName(source));
-      if (file == null || !file.isFile) throw StateError('ZIP page is missing');
-      final bytes = file.readBytes();
-      if (bytes == null ||
-          bytes.length != file.size ||
-          getCrc32(bytes) != file.crc32) {
-        throw StateError('ZIP page is damaged');
-      }
-      return bytes;
+      return _readEntry(archive.find(entryName(source)));
     } finally {
       input.closeSync();
+    }
+  }
+
+  static Uint8List _readEntry(ArchiveFile? file) {
+    if (file == null || !file.isFile) throw StateError('ZIP page is missing');
+    final bytes = file.readBytes();
+    if (bytes == null ||
+        bytes.length != file.size ||
+        getCrc32(bytes) != file.crc32) {
+      throw StateError('ZIP page is damaged');
+    }
+    return bytes;
+  }
+
+  /// Read page dimensions in source order, opening each ZIP once per batch.
+  static Future<List<(int, int)?>> imageSizes(List<String> sources) =>
+      Isolate.run(() {
+        final sizes = List<(int, int)?>.filled(sources.length, null);
+        final archives = <String, Map<String, List<int>>>{};
+        for (var index = 0; index < sources.length; index++) {
+          final source = sources[index];
+          try {
+            if (isEntry(source)) {
+              final entries = archives.putIfAbsent(
+                backingFile(source),
+                () => {},
+              );
+              entries.putIfAbsent(entryName(source), () => []).add(index);
+            } else {
+              final size = dimensions.ImageSizeGetter.getSize(
+                FileInput(File(source)),
+              );
+              sizes[index] = (size.width, size.height);
+            }
+          } catch (_) {
+            // Missing or unreadable pages use the viewer's default dimensions.
+          }
+        }
+
+        for (final archive in archives.entries) {
+          _readZipImageSizes(archive.key, archive.value, sizes);
+        }
+        return sizes;
+      });
+
+  static void _readZipImageSizes(
+    String path,
+    Map<String, List<int>> entries,
+    List<(int, int)?> sizes,
+  ) {
+    try {
+      final input = InputFileStream(path);
+      try {
+        final archive = ZipDecoder().decodeStream(input);
+        for (final entry in entries.entries) {
+          final file = archive.find(entry.key);
+          try {
+            final size = dimensions.ImageSizeGetter.getSize(
+              dimensions.MemoryInput(_readEntry(file)),
+            );
+            for (final index in entry.value) {
+              sizes[index] = (size.width, size.height);
+            }
+          } catch (_) {
+            // A damaged entry does not prevent reading other pages in the ZIP.
+          } finally {
+            file?.clear();
+          }
+        }
+      } finally {
+        input.closeSync();
+      }
+    } catch (_) {
+      // A missing or damaged archive leaves its pages at default dimensions.
     }
   }
 
