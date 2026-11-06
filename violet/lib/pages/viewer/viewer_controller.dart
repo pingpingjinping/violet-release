@@ -373,7 +373,9 @@ class ViewerController extends GetxController {
       // Do not consume a limited automatic retry while the manual retry
       // coordinator is busy or after another request finished this image.
       if (!onSession.value || isImageLoaded[index]) return;
-      if (precacheContext != null && !failedOnlineImages.isFailed(index)) {
+      if (precacheContext != null &&
+          (!Settings.hitomiNearbyFailedImageRecovery.value ||
+              !failedOnlineImages.isFailed(index))) {
         return;
       }
       visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
