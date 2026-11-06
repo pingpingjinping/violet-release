@@ -384,6 +384,7 @@ class ViewerController extends GetxController {
       // Off-screen widgets are not mounted, so changing their URL alone does
       // not send an image request. Actually fetch only confirmed failures.
       if (precacheContext != null &&
+          Settings.hitomiNearbyFailedImageRecovery.value &&
           imgKeys[index].currentState == null &&
           !isImageLoaded[index]) {
         await _precacheRecoveredHitomiImage(precacheContext, index);
