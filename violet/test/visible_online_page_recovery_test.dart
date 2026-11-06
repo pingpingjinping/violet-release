@@ -82,52 +82,66 @@ void main() {
     );
   });
 
-  test('Hitomi looks ahead ten pages but only retries confirmed failures', () {
+  test('Hitomi recovers only failed pages seven ahead and three behind', () {
     final failures = OnlineImageFailureTracker();
-    failures.markFailed(3);
-    failures.markFailed(5);
-    failures.markFailed(8);
-    failures.markFailed(12);
-    failures.markFailed(13);
-    failures.markLoading(8);
+    for (final index in [2, 6, 7, 8, 10, 14, 15, 16]) {
+      failures.markFailed(index);
+    }
+    failures.markLoading(10); // Still downloading; must not be interrupted.
 
-    final nextFailures = VisibleOnlinePageRecovery.failedLookaheadPages(
-      lastVisibleIndex: 2,
+    // The actual viewport spans pages 7-8. Look ahead through page 15,
+    // and behind through page 4, without retrying page 2 or 16.
+    final nearbyFailures = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 7,
+      lastVisibleIndex: 8,
       pageCount: 20,
       isFailed: failures.isFailed,
     ).toList();
-    expect(nextFailures, [3, 5, 12]);
+    expect(nearbyFailures, [14, 15, 6]);
 
     final recovery = VisibleOnlinePageRecovery(stagedImageRetries: true);
-    recovery.imageFailed(3, start);
-    recovery.imageFailed(5, start);
-    recovery.imageFailed(12, start);
+    for (final index in nearbyFailures) {
+      recovery.imageFailed(index, start);
+    }
     expect(
       recovery.candidate(
-        nextFailures,
+        nearbyFailures,
         start.add(const Duration(seconds: 1)),
       )?.index,
-      3,
+      14,
     );
   });
 
-  test('lookahead is empty without known failures and clamps at page end', () {
+  test('nearby recovery clamps to the beginning and end of the gallery', () {
     final failures = OnlineImageFailureTracker();
+    failures.markFailed(0);
+    failures.markFailed(1);
+    failures.markFailed(13);
     failures.markFailed(14);
-    failures.markFailed(16);
     expect(
-      VisibleOnlinePageRecovery.failedLookaheadPages(
-        lastVisibleIndex: 13,
+      VisibleOnlinePageRecovery.failedNearbyPages(
+        firstVisibleIndex: 2,
+        lastVisibleIndex: 3,
         pageCount: 15,
         isFailed: failures.isFailed,
       ).toList(),
-      [14],
+      [1, 0],
     );
     expect(
-      VisibleOnlinePageRecovery.failedLookaheadPages(
-        lastVisibleIndex: 14,
+      VisibleOnlinePageRecovery.failedNearbyPages(
+        firstVisibleIndex: 11,
+        lastVisibleIndex: 12,
         pageCount: 15,
         isFailed: failures.isFailed,
+      ).toList(),
+      [13, 14],
+    );
+    expect(
+      VisibleOnlinePageRecovery.failedNearbyPages(
+        firstVisibleIndex: 0,
+        lastVisibleIndex: 0,
+        pageCount: 15,
+        isFailed: (_) => false,
       ).toList(),
       isEmpty,
     );
