@@ -182,6 +182,45 @@ void main() {
     expect(DownloadArchive.entryName(refs.first), startsWith('thumbnail'));
   });
 
+  test('batch dimensions preserve order across ZIPs and damaged pages', () async {
+    final first = await page('a.png', png);
+    final second = await page(
+      'b.png',
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAIAAAA2iEnWAAAAC0lEQVR4nGNgwAIAABUAAapll8QAAAAASUVORK5CYII=',
+      ),
+    );
+    final invalid = await page('invalid.png', [1, 2, 3, 4, 5, 6]);
+    final firstZip = '${root.path}/damaged.zip';
+    final firstRefs = await DownloadArchive.create(firstZip, [
+      first,
+      second,
+      invalid,
+    ]);
+    final secondRefs = await DownloadArchive.create('${root.path}/ok.zip', [
+      first,
+    ]);
+    final raw = await File(firstZip).readAsBytes();
+    // Change a byte beyond the dimension header so only CRC detects it.
+    final offset = 30 + raw[26] + (raw[27] << 8) + raw[28] + (raw[29] << 8);
+    raw[offset + png.length - 1] ^= 1;
+    await File(firstZip).writeAsBytes(raw);
+
+    expect(
+      await downloadImageSizes([
+        firstRefs[0],
+        secondRefs.first,
+        DownloadArchive.entry(firstZip, 'missing.png'),
+        firstRefs[1],
+        firstRefs[2],
+        DownloadArchive.entry('${root.path}/absent.zip', '000000.png'),
+        first,
+        firstRefs[1],
+      ]),
+      [null, (1, 1), null, (2, 3), null, null, (1, 1), (2, 3)],
+    );
+  });
+
   test(
     'Flutter image provider and image dimensions read ZIP without extraction',
     () async {
