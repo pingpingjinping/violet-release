@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:synchronized/synchronized.dart';
+
 /// Stable per-page metadata loading shared by all online gallery providers.
 /// Retries transient failures, then preserves terminal error for a retry UI.
 class OnlinePageLoadCoordinator {
@@ -31,4 +33,23 @@ class OnlinePageLoadCoordinator {
       }
     }
   }
+}
+
+/// Serialize image retries and let a manual request wait for automatic recovery.
+class OnlineImageRetryCoordinator {
+  final _lock = Lock();
+  Future<void>? _manualRetry;
+
+  bool get isBusy => _lock.locked || _manualRetry != null;
+
+  Future<bool> tryAutomatic(Future<void> Function() retry) async {
+    if (isBusy) return false;
+    await _lock.synchronized(retry);
+    return true;
+  }
+
+  Future<void> runManual(Future<void> Function() retry) =>
+      _manualRetry ??= _lock.synchronized(retry).whenComplete(() {
+        _manualRetry = null;
+      });
 }

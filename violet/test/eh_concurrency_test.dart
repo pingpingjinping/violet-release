@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:violet/component/eh/eh_provider.dart';
 import 'package:violet/component/ordered_extraction.dart';
+import 'package:violet/settings/settings.dart';
 import 'package:violet/thread/semaphore.dart';
 
 void main() {
@@ -59,5 +61,53 @@ void main() {
     final third = await thirdFuture;
     expect(thirdStarted, isTrue);
     third();
+  });
+
+  test('EH/EX retries refresh only the target image page', () async {
+    await Settings.downloadEhRawImage.setValue(false);
+    for (final host in ['e-hentai.org', 'exhentai.org']) {
+      final calls = <(String, bool)>[];
+      final firstPage = 'https://$host/s/abc/123-1';
+      final secondPage = 'https://$host/s/def/123-2';
+      var failRefresh = false;
+      final provider = EHentaiImageProvider(
+        count: 2,
+        thumbnail: '',
+        pagesUrl: ['https://$host/g/123/token/?p=0'],
+        isEHentai: host == 'e-hentai.org',
+        imagesPerPage: 2,
+        requestImagePage: (url, {required bypassCache}) async {
+          calls.add((url, bypassCache));
+          if (failRefresh && bypassCache) throw StateError('lookup failed');
+          final imageUrl = bypassCache ? 'fresh' : 'cached';
+          return '<div id="i1"><div id="i3"><a><img src="$imageUrl"></a>'
+              '</div></div>';
+        },
+      );
+      await provider.init();
+      provider.urls
+        ..[0] = firstPage
+        ..[1] = secondPage;
+
+      expect(await provider.getImageUrl(0), 'cached');
+      expect(await provider.getImageUrl(0), 'cached');
+      expect(await provider.getImageUrl(1), 'cached');
+
+      final fresh = provider.getImageUrlForRetry(0);
+      expect(identical(fresh, provider.getImageUrlForRetry(0)), isTrue);
+      expect(await fresh, 'fresh');
+      expect(await provider.getImageUrl(0), 'fresh');
+      expect(await provider.getImageUrl(1), 'cached');
+
+      failRefresh = true;
+      await expectLater(provider.getImageUrlForRetry(0), throwsStateError);
+      expect(await provider.getImageUrl(0), 'fresh');
+      expect(calls, [
+        (firstPage, false),
+        (secondPage, false),
+        (firstPage, true),
+        (firstPage, true),
+      ]);
+    }
   });
 }

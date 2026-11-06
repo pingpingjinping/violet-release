@@ -16,9 +16,16 @@ class EHSession {
     return '${prefs.getString('eh_cookies')}; nw=1';
   }
 
-  static Future<String> requestString(String url) async {
+  static Future<String> requestString(
+    String url, {
+    bool bypassCache = false,
+  }) async {
     final cookie = await EHSession.cookie();
-    return (await http.get(url, headers: {'Cookie': cookie ?? ''})).body;
+    return (await http.get(
+      url,
+      headers: {'Cookie': cookie ?? ''},
+      bypassEhCache: bypassCache,
+    )).body;
   }
 
   static Future<String?> requestRedirect(String url) async {

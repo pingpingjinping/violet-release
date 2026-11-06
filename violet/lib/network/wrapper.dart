@@ -57,9 +57,15 @@ Future<http.Response> get(
   String url, {
   Map<String, String>? headers,
   Duration? timeout,
+  bool bypassEhCache = false,
 }) async {
   if (url.contains('exhentai.org') || url.contains('e-hentai.org')) {
-    return await _ehentaiGet(url, headers: headers, timeout: timeout);
+    return await _ehentaiGet(
+      url,
+      headers: headers,
+      timeout: timeout,
+      bypassCache: bypassEhCache,
+    );
   } else if (_isScriptUrl(url)) {
     return await _scriptGet(url, headers: headers, timeout: timeout);
   }
@@ -96,9 +102,12 @@ Future<http.Response> _ehentaiGet(
   String url, {
   Map<String, String>? headers,
   Duration? timeout,
+  required bool bypassCache,
 }) async {
-  final cached = HttpWrapper.cacheResponse[url];
-  if (cached != null) return cached;
+  if (!bypassCache) {
+    final cached = HttpWrapper.cacheResponse[url];
+    if (cached != null) return cached;
+  }
 
   // Apply saved values even on the first request after app startup.
   HttpWrapper.applyConcurrencySettings();
@@ -108,8 +117,10 @@ Future<http.Response> _ehentaiGet(
   final release = await throttler.acquire();
   try {
     // Another request may have filled the cache while we waited.
-    final previous = HttpWrapper.cacheResponse[url];
-    if (previous != null) return previous;
+    if (!bypassCache) {
+      final previous = HttpWrapper.cacheResponse[url];
+      if (previous != null) return previous;
+    }
 
     Logger.info('[Http Request] GET: $url');
     // A stalled request must not hold the global ExHentai slot indefinitely.

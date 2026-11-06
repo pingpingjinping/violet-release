@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
 
@@ -75,5 +77,54 @@ void main() {
     });
     expect(firstCount, 2);
     expect(secondCount, 1);
+  });
+
+  test(
+    'manual image retry waits for automatic recovery and runs once',
+    () async {
+      final retries = OnlineImageRetryCoordinator();
+      final releaseAutomatic = Completer<void>();
+      final calls = <String>[];
+      final automatic = retries.tryAutomatic(() async {
+        calls.add('automatic');
+        await releaseAutomatic.future;
+      });
+
+      final manual = retries.runManual(() async {
+        calls.add('manual');
+      });
+      expect(
+        identical(
+          manual,
+          retries.runManual(() async => fail('duplicate retry')),
+        ),
+        isTrue,
+      );
+      expect(calls, ['automatic']);
+      expect(await retries.tryAutomatic(() async => fail('overlap')), isFalse);
+
+      releaseAutomatic.complete();
+      expect(await automatic, isTrue);
+      await manual;
+      expect(calls, ['automatic', 'manual']);
+      expect(retries.isBusy, isFalse);
+    },
+  );
+
+  test('automatic recovery failure still lets the manual retry run', () async {
+    final retries = OnlineImageRetryCoordinator();
+    final releaseAutomatic = Completer<void>();
+    final automatic = retries.tryAutomatic(() => releaseAutomatic.future);
+    final error = expectLater(automatic, throwsStateError);
+    var manualRan = false;
+    final manual = retries.runManual(() async {
+      manualRan = true;
+    });
+
+    releaseAutomatic.completeError(StateError('automatic retry failed'));
+    await error;
+    await manual;
+    expect(manualRan, isTrue);
+    expect(retries.isBusy, isFalse);
   });
 }
