@@ -87,10 +87,9 @@ void main() {
     for (final index in [2, 6, 7, 8, 10, 14, 15, 16]) {
       failures.markFailed(index);
     }
-    failures.markLoading(10); // Still downloading; must not be interrupted.
+    failures.markLoading(10);
 
-    // The actual viewport spans pages 7-8. Look ahead through page 15,
-    // and behind through page 4, without retrying page 2 or 16.
+    // Visible pages 7-8, next 7 pages, previous 3 pages.
     final nearbyFailures = VisibleOnlinePageRecovery.failedNearbyPages(
       firstVisibleIndex: 7,
       lastVisibleIndex: 8,
@@ -103,13 +102,9 @@ void main() {
     for (final index in nearbyFailures) {
       recovery.imageFailed(index, start);
     }
-    expect(
-      recovery.candidate(
-        nearbyFailures,
-        start.add(const Duration(seconds: 1)),
-      )?.index,
-      14,
-    );
+    final when = start.add(const Duration(seconds: 1));
+    final retry = recovery.candidate(nearbyFailures, when);
+    expect(retry?.index, 14);
   });
 
   test('nearby recovery respects gallery boundaries', () {
@@ -118,33 +113,30 @@ void main() {
     failures.markFailed(1);
     failures.markFailed(13);
     failures.markFailed(14);
-    expect(
-      VisibleOnlinePageRecovery.failedNearbyPages(
-        firstVisibleIndex: 2,
-        lastVisibleIndex: 3,
-        pageCount: 15,
-        isFailed: failures.isFailed,
-      ).toList(),
-      [1, 0],
-    );
-    expect(
-      VisibleOnlinePageRecovery.failedNearbyPages(
-        firstVisibleIndex: 11,
-        lastVisibleIndex: 12,
-        pageCount: 15,
-        isFailed: failures.isFailed,
-      ).toList(),
-      [13, 14],
-    );
-    expect(
-      VisibleOnlinePageRecovery.failedNearbyPages(
-        firstVisibleIndex: 0,
-        lastVisibleIndex: 0,
-        pageCount: 15,
-        isFailed: (_) => false,
-      ).toList(),
-      isEmpty,
-    );
+
+    final atStart = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 2,
+      lastVisibleIndex: 3,
+      pageCount: 15,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(atStart, [1, 0]);
+
+    final atEnd = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 11,
+      lastVisibleIndex: 12,
+      pageCount: 15,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(atEnd, [13, 14]);
+
+    final noFailures = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 0,
+      lastVisibleIndex: 0,
+      pageCount: 15,
+      isFailed: (_) => false,
+    ).toList();
+    expect(noFailures, isEmpty);
   });
 
   test('Hitomi refreshes the URL first, then retries it twice', () {
