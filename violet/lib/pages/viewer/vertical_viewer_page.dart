@@ -242,7 +242,6 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         c.retryPageLoad(retry.index);
         if (mounted) setState(() {});
       } else if (!c.isRefreshingImages && c.urlCache[retry.index] != null) {
-        c.visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
         await c.retryVisibleImage(retry);
       }
     } catch (error) {
