@@ -80,10 +80,10 @@ class EHentaiImageProvider extends VioletImageProvider {
     }
 
     // Share ongoing lookups while preserving the last URL if a refresh fails.
-    return _pendingImageUrls[page] = _resolveImageUrl(
-      page,
-      refresh: refresh,
-    ).whenComplete(() => _pendingImageUrls.remove(page));
+    return _pendingImageUrls[page] = _resolveImageUrl(page, refresh: refresh)
+        .whenComplete(() {
+          _pendingImageUrls.remove(page);
+        });
   }
 
   Future<String> _resolveImageUrl(int page, {required bool refresh}) async {
