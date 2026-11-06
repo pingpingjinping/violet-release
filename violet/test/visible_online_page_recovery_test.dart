@@ -81,7 +81,7 @@ void main() {
     );
   });
 
-  test('Hitomi quickly retries twice before refreshing the image URL', () {
+  test('Hitomi refreshes the URL first, then retries it twice', () {
     final state = VisibleOnlinePageRecovery(stagedImageRetries: true);
     state.imageFailed(1, start);
     expect(
@@ -90,9 +90,9 @@ void main() {
     );
 
     const stages = [
-      VisiblePageRetryType.image,
-      VisiblePageRetryType.image,
       VisiblePageRetryType.imageWithRefreshedUrl,
+      VisiblePageRetryType.image,
+      VisiblePageRetryType.image,
     ];
     for (var i = 0; i < stages.length; i++) {
       final at = start.add(Duration(seconds: i + 1));
@@ -115,7 +115,7 @@ void main() {
 
     final next = state.candidate([1, 2], start.add(const Duration(seconds: 2)));
     expect(next?.index, first.index == 1 ? 2 : 1);
-    expect(next?.type, VisiblePageRetryType.image);
+    expect(next?.type, VisiblePageRetryType.imageWithRefreshedUrl);
   });
 
   test('Hitomi metadata recovery does not spend image retries', () {
@@ -131,7 +131,7 @@ void main() {
     expect(state.automaticAttempts(1), 0);
     expect(
       state.candidate([1], at.add(const Duration(seconds: 1)))?.type,
-      VisiblePageRetryType.image,
+      VisiblePageRetryType.imageWithRefreshedUrl,
     );
   });
 }
