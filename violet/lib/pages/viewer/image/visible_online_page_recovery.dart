@@ -129,8 +129,7 @@ class VisibleOnlinePageRecovery {
         continue;
       }
       final elapsed = now.difference(state.lastActivity!);
-      final imageType =
-          stagedImage && state.automaticAttempts == 0
+      final imageType = stagedImage && state.automaticAttempts == 0
           ? VisiblePageRetryType.imageWithRefreshedUrl
           : VisiblePageRetryType.image;
       switch (state.phase) {
