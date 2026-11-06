@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
 import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 
 void main() {
@@ -78,6 +79,57 @@ void main() {
     expect(
       state.candidate([6], start.add(const Duration(minutes: 6, seconds: 6))),
       isNotNull,
+    );
+  });
+
+  test('Hitomi looks ahead ten pages but only retries confirmed failures', () {
+    final failures = OnlineImageFailureTracker();
+    failures.markFailed(3);
+    failures.markFailed(5);
+    failures.markFailed(8);
+    failures.markFailed(12);
+    failures.markFailed(13);
+    failures.markLoading(8);
+
+    final nextFailures = VisibleOnlinePageRecovery.failedLookaheadPages(
+      lastVisibleIndex: 2,
+      pageCount: 20,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(nextFailures, [3, 5, 12]);
+
+    final recovery = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    recovery.imageFailed(3, start);
+    recovery.imageFailed(5, start);
+    recovery.imageFailed(12, start);
+    expect(
+      recovery.candidate(
+        nextFailures,
+        start.add(const Duration(seconds: 1)),
+      )?.index,
+      3,
+    );
+  });
+
+  test('lookahead is empty without known failures and clamps at page end', () {
+    final failures = OnlineImageFailureTracker();
+    failures.markFailed(14);
+    failures.markFailed(16);
+    expect(
+      VisibleOnlinePageRecovery.failedLookaheadPages(
+        lastVisibleIndex: 13,
+        pageCount: 15,
+        isFailed: failures.isFailed,
+      ).toList(),
+      [14],
+    );
+    expect(
+      VisibleOnlinePageRecovery.failedLookaheadPages(
+        lastVisibleIndex: 14,
+        pageCount: 15,
+        isFailed: failures.isFailed,
+      ).toList(),
+      isEmpty,
     );
   });
 
