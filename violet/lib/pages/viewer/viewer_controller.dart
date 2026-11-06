@@ -405,7 +405,7 @@ class ViewerController extends GetxController {
         provider: ExtendedNetworkImageProvider(
           url,
           headers: header,
-          cache: true,
+          cache: false,
           retries: policy.retries,
           timeRetry: policy.interval,
         ),
