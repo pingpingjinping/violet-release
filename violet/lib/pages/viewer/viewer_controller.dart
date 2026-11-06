@@ -363,9 +363,13 @@ class ViewerController extends GetxController {
       return false;
     }
 
-    return _imageRetries.tryAutomatic(
-      () => _retryImage(index, automatic: retry),
-    );
+    return _imageRetries.tryAutomatic(() async {
+      // Do not consume a limited automatic retry while the manual retry
+      // coordinator is busy or after another request finished this image.
+      if (!onSession.value || isImageLoaded[index]) return;
+      visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
+      await _retryImage(index, automatic: retry);
+    });
   }
 
   /// The purple refresh button retries all currently confirmed image failures.
