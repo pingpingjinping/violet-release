@@ -37,6 +37,8 @@ class VisibleOnlinePageRecovery {
   static const Duration retryCooldown = Duration(seconds: 20);
   static const int maxAutomaticAttempts = 2;
   static const Duration _quickFailureDelay = Duration(seconds: 1);
+  // First attempt refreshes a potentially stale gallery URL; the remaining
+  // two attempts reuse the resolved URL without additional gallery lookups.
   static const int _sameUrlAttempts = 2;
 
   final bool stagedImageRetries;
@@ -128,7 +130,7 @@ class VisibleOnlinePageRecovery {
       }
       final elapsed = now.difference(state.lastActivity!);
       final imageType =
-          stagedImage && state.automaticAttempts == _sameUrlAttempts
+          stagedImage && state.automaticAttempts == 0
           ? VisiblePageRetryType.imageWithRefreshedUrl
           : VisiblePageRetryType.image;
       switch (state.phase) {
