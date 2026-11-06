@@ -117,17 +117,14 @@ void main() {
     final recovery = VisibleOnlinePageRecovery(stagedImageRetries: true);
     final start = DateTime.utc(2026, 11, 6);
     recovery.imageFailed(7, start);
-    final retry =
-        recovery.candidate([7], start.add(const Duration(seconds: 1)))!;
+    final firstAttemptAt = start.add(const Duration(seconds: 1));
+    final retry = recovery.candidate([7], firstAttemptAt)!;
     expect(retry.type, VisiblePageRetryType.imageWithRefreshedUrl);
 
     final releaseManual = Completer<void>();
     final manual = retries.runManual(() => releaseManual.future);
     final accepted = await retries.tryAutomatic(() async {
-      recovery.beginAutomaticRetry(
-        retry,
-        start.add(const Duration(seconds: 1)),
-      );
+      recovery.beginAutomaticRetry(retry, firstAttemptAt);
     });
     expect(accepted, isFalse);
     expect(recovery.automaticAttempts(7), 0);
