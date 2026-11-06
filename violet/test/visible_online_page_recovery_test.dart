@@ -82,7 +82,7 @@ void main() {
     );
   });
 
-  test('Hitomi recovers only failed pages seven ahead and three behind', () {
+  test('Hitomi recovers only confirmed nearby failures', () {
     final failures = OnlineImageFailureTracker();
     for (final index in [2, 6, 7, 8, 10, 14, 15, 16]) {
       failures.markFailed(index);
@@ -112,7 +112,7 @@ void main() {
     );
   });
 
-  test('nearby recovery clamps to the beginning and end of the gallery', () {
+  test('nearby recovery respects gallery boundaries', () {
     final failures = OnlineImageFailureTracker();
     failures.markFailed(0);
     failures.markFailed(1);
