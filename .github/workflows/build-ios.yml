@@ -24,9 +24,10 @@ jobs:
       - name: Select Xcode 16
         run: |
           for xcode_path in \
-            /Applications/Xcode_16.0.app \
-            /Applications/Xcode_16.1.app \
-            /Applications/Xcode_16.app; do
+            /Applications/Xcode_16.4.app \
+            /Applications/Xcode_16.3.app \
+            /Applications/Xcode_16.2.app \
+            /Applications/Xcode_16.1.app; do
             if [ -d "$xcode_path" ]; then
               sudo xcode-select -s "$xcode_path/Contents/Developer"
               xcodebuild -version
