@@ -41,18 +41,30 @@ class VisibleOnlinePageRecovery {
   // two attempts reuse the resolved URL without additional gallery lookups.
   static const int _sameUrlAttempts = 2;
 
-  /// Select only previously confirmed failed images in the next [lookahead]
-  /// pages. This does not initiate initial loads or touch in-progress images.
-  static Iterable<int> failedLookaheadPages({
+  /// Select confirmed failed images around the viewport, prioritizing the
+  /// next seven pages before the previous three. Neither unattempted pages
+  /// nor pages still actively loading are eligible for recovery.
+  static Iterable<int> failedNearbyPages({
+    required int firstVisibleIndex,
     required int lastVisibleIndex,
     required int pageCount,
     required bool Function(int index) isFailed,
-    int lookahead = 10,
+    int previous = 3,
+    int next = 7,
   }) sync* {
-    if (lastVisibleIndex < 0 || lastVisibleIndex >= pageCount) return;
+    if (firstVisibleIndex < 0 ||
+        lastVisibleIndex >= pageCount ||
+        firstVisibleIndex > lastVisibleIndex) {
+      return;
+    }
     for (var index = lastVisibleIndex + 1;
-        index < pageCount && index <= lastVisibleIndex + lookahead;
+        index < pageCount && index <= lastVisibleIndex + next;
         index++) {
+      if (isFailed(index)) yield index;
+    }
+    for (var index = firstVisibleIndex - 1;
+        index >= 0 && index >= firstVisibleIndex - previous;
+        index--) {
       if (isFailed(index)) yield index;
     }
   }
