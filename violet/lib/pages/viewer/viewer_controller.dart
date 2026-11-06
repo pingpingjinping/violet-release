@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:get/get.dart';
+import 'package:violet/component/hitomi/hitomi_provider.dart';
 import 'package:violet/component/hitomi/message_search.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
@@ -87,7 +88,9 @@ class ViewerController extends GetxController {
   final _imageRetries = OnlineImageRetryCoordinator();
   // Actual image download failures, not pages still loading or resolving URLs.
   final failedOnlineImages = OnlineImageFailureTracker();
-  final visiblePageRecovery = VisibleOnlinePageRecovery();
+  late final visiblePageRecovery = VisibleOnlinePageRecovery(
+    stagedImageRetries: provider.provider is HitomiImageProvider,
+  );
   bool get isRefreshingImages => _imageRetries.isBusy;
 
   /// these are used on overlay
@@ -350,7 +353,8 @@ class ViewerController extends GetxController {
   }
 
   /// Automatic recovery only retries the one visible page.
-  Future<bool> retryVisibleImage(int index) async {
+  Future<bool> retryVisibleImage(VisiblePageRetry retry) async {
+    final index = retry.index;
     if (!provider.useProvider ||
         provider.provider == null ||
         index < 0 ||
@@ -359,7 +363,9 @@ class ViewerController extends GetxController {
       return false;
     }
 
-    return _imageRetries.tryAutomatic(() => _retryImage(index));
+    return _imageRetries.tryAutomatic(
+      () => _retryImage(index, automatic: retry),
+    );
   }
 
   /// The purple refresh button retries all currently confirmed image failures.
@@ -396,6 +402,7 @@ class ViewerController extends GetxController {
   Future<void> _retryImage(
     int index, {
     bool confirmedFailureOnly = false,
+    VisiblePageRetry? automatic,
   }) async {
     final source = provider.provider!;
     final cachedUrl = urlCache[index];
@@ -411,7 +418,14 @@ class ViewerController extends GetxController {
     Map<String, String>? nextHeader;
     try {
       nextHeader = await source.getHeader(index);
-      final url = await source.getImageUrlForRetry(index);
+      final String url;
+      if (source is HitomiImageProvider && automatic != null) {
+        url = automatic.type == VisiblePageRetryType.imageWithRefreshedUrl
+            ? await source.refreshImageUrlForAutomaticRetry(index, oldUrl)
+            : oldUrl;
+      } else {
+        url = await source.getImageUrlForRetry(index);
+      }
       if (url.trim().isEmpty) throw StateError('Empty URL at page $index');
       nextUrl = url;
     } catch (error, stackTrace) {

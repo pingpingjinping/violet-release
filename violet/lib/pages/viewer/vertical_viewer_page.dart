@@ -106,7 +106,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     // never all missing URLs or every page in the cache extent.
     if (c.provider.useProvider) {
       _visibleRecoveryTimer = Timer.periodic(
-        const Duration(seconds: 3),
+        Duration(seconds: c.visiblePageRecovery.stagedImageRetries ? 1 : 3),
         (_) => _recoverVisibleOnlinePage(),
       );
     }
@@ -208,7 +208,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   /// Only pages that intersect the *actual* viewport may be recovered.
   ///
   /// Normal prefetch and actively progressing image transfers are excluded;
-  /// the pure policy limits every page to two attempts in this viewer session.
+  /// the recovery policy limits the number of attempts per page.
   Future<void> _recoverVisibleOnlinePage() async {
     if (_checkingVisibleRecovery ||
         !mounted ||
@@ -243,7 +243,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         if (mounted) setState(() {});
       } else if (!c.isRefreshingImages && c.urlCache[retry.index] != null) {
         c.visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
-        await c.retryVisibleImage(retry.index);
+        await c.retryVisibleImage(retry);
       }
     } catch (error) {
       // A failed automatic attempt never starts an unbounded retry loop.
