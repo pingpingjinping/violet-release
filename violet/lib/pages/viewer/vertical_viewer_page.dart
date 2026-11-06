@@ -103,7 +103,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         });
 
     // Check real viewport geometry before choosing a page. Hitomi may also
-    // retry already-failed images within ten upcoming pages, never fresh ones.
+    // retry already-failed images from three behind to seven ahead.
     if (c.provider.useProvider) {
       _visibleRecoveryTimer = Timer.periodic(
         Duration(seconds: c.visiblePageRecovery.stagedImageRetries ? 1 : 3),
@@ -206,8 +206,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
   }
 
   /// Always prioritize on-screen failures. For Hitomi, recover confirmed
-  /// image failures within the next ten pages without touching fresh loads.
-  /// All requests stay serialized and each page has a bounded retry budget.
+  /// failures in the next seven and previous three pages without touching
+  /// initial loads. Requests remain serialized with bounded retry budgets.
   Future<void> _recoverVisibleOnlinePage() async {
     if (_checkingVisibleRecovery ||
         !mounted ||
@@ -237,13 +237,15 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     if (retry == null &&
         c.visiblePageRecovery.stagedImageRetries &&
         visible.isNotEmpty) {
+      final firstVisibleIndex = visible.reduce((a, b) => a < b ? a : b);
       final lastVisibleIndex = visible.reduce((a, b) => a > b ? a : b);
-      final failedAhead = VisibleOnlinePageRecovery.failedLookaheadPages(
+      final failedNearby = VisibleOnlinePageRecovery.failedNearbyPages(
+        firstVisibleIndex: firstVisibleIndex,
         lastVisibleIndex: lastVisibleIndex,
         pageCount: c.maxPage,
         isFailed: c.failedOnlineImages.isFailed,
       );
-      retry = c.visiblePageRecovery.candidate(failedAhead, now);
+      retry = c.visiblePageRecovery.candidate(failedNearby, now);
       isLookaheadRetry = retry != null;
     }
     if (retry == null) return;
