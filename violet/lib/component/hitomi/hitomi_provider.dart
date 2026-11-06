@@ -108,7 +108,9 @@ class HitomiImageProvider extends VioletImageProvider {
   }
 
   @override
-  Future<void> refresh() => _refresh();
+  Future<void> refresh() async {
+    _replaceImageList(await HitomiManager.getImageList(id));
+  }
 
   Future<String> refreshImageUrlForAutomaticRetry(
     int page,
@@ -124,8 +126,8 @@ class HitomiImageProvider extends VioletImageProvider {
       await pending;
     } else if (last == null ||
         DateTime.now().difference(last) >= const Duration(seconds: 5)) {
-      await (_pendingAutomaticRefresh =
-          _refresh(timeout: const Duration(seconds: 8)).whenComplete(() {
+      await (_pendingAutomaticRefresh = _refreshForCurrentPageCount()
+          .whenComplete(() {
             _pendingAutomaticRefresh = null;
             _lastAutomaticRefresh = DateTime.now();
           }));
@@ -133,9 +135,18 @@ class HitomiImageProvider extends VioletImageProvider {
     return imageList.urls[page];
   }
 
-  Future<void> _refresh({Duration? timeout}) async {
-    final lookup = HitomiManager.getImageList(id);
-    final next = await (timeout == null ? lookup : lookup.timeout(timeout));
+  Future<void> _refreshForCurrentPageCount() async {
+    final next = await HitomiManager.getImageList(
+      id,
+    ).timeout(const Duration(seconds: 8));
+    // The open viewer keeps its original page indices for the whole session.
+    if (next.urls.length != imageList.urls.length) {
+      throw StateError('Hitomi page count changed during recovery for $id');
+    }
+    _replaceImageList(next);
+  }
+
+  void _replaceImageList(ImageList next) {
     if (next.urls.isEmpty || next.bigThumbnails.isEmpty) {
       throw StateError('Hitomi image list refresh returned empty for $id');
     }
