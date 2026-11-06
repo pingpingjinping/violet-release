@@ -57,14 +57,14 @@ class VisibleOnlinePageRecovery {
         firstVisibleIndex > lastVisibleIndex) {
       return;
     }
-    for (var index = lastVisibleIndex + 1;
-        index < pageCount && index <= lastVisibleIndex + next;
-        index++) {
+    for (var offset = 1; offset <= next; offset++) {
+      final index = lastVisibleIndex + offset;
+      if (index >= pageCount) break;
       if (isFailed(index)) yield index;
     }
-    for (var index = firstVisibleIndex - 1;
-        index >= 0 && index >= firstVisibleIndex - previous;
-        index--) {
+    for (var offset = 1; offset <= previous; offset++) {
+      final index = firstVisibleIndex - offset;
+      if (index < 0) break;
       if (isFailed(index)) yield index;
     }
   }
