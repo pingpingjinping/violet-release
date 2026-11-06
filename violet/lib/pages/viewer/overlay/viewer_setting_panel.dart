@@ -136,6 +136,15 @@ class _ViewerSettingPanelState extends State<ViewerSettingPanel> {
             if (mounted) setState(() {});
           },
         ),
+        if (c.visiblePageRecovery.stagedImageRetries)
+          _checkBox(
+            title: '주변 실패 이미지 미리 복구 (이전 3 / 다음 7)',
+            value: Settings.hitomiNearbyFailedImageRecovery.value,
+            onChanged: (enabled) async {
+              await Settings.hitomiNearbyFailedImageRecovery.setValue(enabled);
+              if (mounted) setState(() {});
+            },
+          ),
         _checkBox(
           title: locale.Translations.instance!.trans('togglerighttoleft'),
           value: Settings.rightToLeft.value,

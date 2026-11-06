@@ -236,6 +236,7 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     var isLookaheadRetry = false;
     if (retry == null &&
         c.visiblePageRecovery.stagedImageRetries &&
+        Settings.hitomiNearbyFailedImageRecovery.value &&
         visible.isNotEmpty) {
       final firstVisibleIndex = visible.reduce((a, b) => a < b ? a : b);
       final lastVisibleIndex = visible.reduce((a, b) => a > b ? a : b);

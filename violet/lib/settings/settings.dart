@@ -121,6 +121,12 @@ class Settings {
     'deferOnlineVerticalScrollCorrection',
     false,
   );
+  // Hitomi vertical viewer: recover confirmed failed images up to three pages
+  // behind and seven pages ahead. Visible-page recovery always stays active.
+  static final hitomiNearbyFailedImageRecovery = SettingItem<bool>(
+    'hitomiNearbyFailedImageRecovery',
+    true,
+  );
   static final animation = SettingItem<bool>('animation', false);
   static final padding = SettingItem<bool>('padding', false);
   static final disableOverlayButton = SettingItem<bool>(

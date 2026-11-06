@@ -373,7 +373,9 @@ class ViewerController extends GetxController {
       // Do not consume a limited automatic retry while the manual retry
       // coordinator is busy or after another request finished this image.
       if (!onSession.value || isImageLoaded[index]) return;
-      if (precacheContext != null && !failedOnlineImages.isFailed(index)) {
+      if (precacheContext != null &&
+          (!Settings.hitomiNearbyFailedImageRecovery.value ||
+              !failedOnlineImages.isFailed(index))) {
         return;
       }
       visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
@@ -382,6 +384,7 @@ class ViewerController extends GetxController {
       // Off-screen widgets are not mounted, so changing their URL alone does
       // not send an image request. Actually fetch only confirmed failures.
       if (precacheContext != null &&
+          Settings.hitomiNearbyFailedImageRecovery.value &&
           imgKeys[index].currentState == null &&
           !isImageLoaded[index]) {
         await _precacheRecoveredHitomiImage(precacheContext, index);
