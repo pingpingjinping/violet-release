@@ -80,4 +80,58 @@ void main() {
       isNotNull,
     );
   });
+
+  test('Hitomi quickly retries twice before refreshing the image URL', () {
+    final state = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    state.imageFailed(1, start);
+    expect(
+      state.candidate([1], start.add(const Duration(milliseconds: 999))),
+      isNull,
+    );
+
+    const stages = [
+      VisiblePageRetryType.image,
+      VisiblePageRetryType.image,
+      VisiblePageRetryType.imageWithRefreshedUrl,
+    ];
+    for (var i = 0; i < stages.length; i++) {
+      final at = start.add(Duration(seconds: i + 1));
+      final retry = state.candidate([1], at)!;
+      expect(retry.type, stages[i]);
+      state.beginAutomaticRetry(retry, at);
+      state.imageFailed(1, at);
+    }
+    expect(state.candidate([1], start.add(const Duration(minutes: 2))), isNull);
+  });
+
+  test('Hitomi gives each visible failure a turn before its next stage', () {
+    final state = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    state.imageFailed(1, start);
+    state.imageFailed(2, start);
+    final firstAt = start.add(const Duration(seconds: 1));
+    final first = state.candidate([1, 2], firstAt)!;
+    state.beginAutomaticRetry(first, firstAt);
+    state.imageFailed(first.index, firstAt);
+
+    final next = state.candidate([1, 2], start.add(const Duration(seconds: 2)));
+    expect(next?.index, first.index == 1 ? 2 : 1);
+    expect(next?.type, VisiblePageRetryType.image);
+  });
+
+  test('Hitomi metadata recovery does not spend image retries', () {
+    final state = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    state.metadataFailed(1, start);
+    final at = start.add(const Duration(seconds: 6));
+    final retry = state.candidate([1], at)!;
+    expect(retry.type, VisiblePageRetryType.metadata);
+    state.beginAutomaticRetry(retry, at);
+    state.metadataReady(1);
+    state.imageFailed(1, at);
+
+    expect(state.automaticAttempts(1), 0);
+    expect(
+      state.candidate([1], at.add(const Duration(seconds: 1)))?.type,
+      VisiblePageRetryType.image,
+    );
+  });
 }

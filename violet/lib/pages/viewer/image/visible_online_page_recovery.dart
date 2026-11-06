@@ -3,7 +3,7 @@
 /// This class does not own timers or fetch images. The vertical viewer supplies
 /// actual on-screen indices, while ProviderImage supplies byte progress.
 /// Prefetched/off-screen pages never trigger automatic network requests.
-enum VisiblePageRetryType { metadata, image }
+enum VisiblePageRetryType { metadata, image, imageWithRefreshedUrl }
 
 class VisiblePageRetry {
   final int index;
@@ -30,15 +30,19 @@ class _PageRecoveryState {
 
 /// Only terminal failures or image streams without *byte progress* may retry.
 ///
-/// At most two automatic recoveries per page within this viewer session.
 /// A successfully rendered image resets its budget; manual retries are separate.
 class VisibleOnlinePageRecovery {
   static const Duration failureDelay = Duration(seconds: 6);
   static const Duration stalledImageDelay = Duration(seconds: 30);
   static const Duration retryCooldown = Duration(seconds: 20);
   static const int maxAutomaticAttempts = 2;
+  static const Duration _quickFailureDelay = Duration(seconds: 1);
+  static const int _sameUrlAttempts = 2;
 
+  final bool stagedImageRetries;
   final Map<int, _PageRecoveryState> _states = {};
+
+  VisibleOnlinePageRecovery({this.stagedImageRetries = false});
 
   _PageRecoveryState _state(int index) =>
       _states.putIfAbsent(index, _PageRecoveryState.new);
@@ -65,6 +69,10 @@ class VisibleOnlinePageRecovery {
     if (state.phase == _VisiblePagePhase.metadataFailed ||
         state.phase == _VisiblePagePhase.metadataLoading) {
       state.phase = _VisiblePagePhase.idle;
+      if (stagedImageRetries) {
+        state.automaticAttempts = 0;
+        state.lastAttempt = null;
+      }
     }
   }
 
@@ -94,30 +102,47 @@ class VisibleOnlinePageRecovery {
   /// The caller must pass indices truly intersecting the viewport, not cache
   /// extent/prefetch indices. Only one candidate is returned per timer tick.
   VisiblePageRetry? candidate(Iterable<int> visible, DateTime now) {
-    for (final index in visible) {
+    // Give other visible pages their quick retries before a gallery lookup.
+    final indices = stagedImageRetries
+        ? (visible.toList()..sort(
+            (left, right) =>
+                automaticAttempts(left).compareTo(automaticAttempts(right)),
+          ))
+        : visible;
+    for (final index in indices) {
       final state = _states[index];
-      if (state == null ||
-          state.automaticAttempts >= maxAutomaticAttempts ||
-          state.lastActivity == null) {
-        continue;
-      }
+      if (state == null || state.lastActivity == null) continue;
+      final stagedImage =
+          stagedImageRetries &&
+          (state.phase == _VisiblePagePhase.imageFailed ||
+              state.phase == _VisiblePagePhase.imageLoading);
+      final maxAttempts = stagedImage
+          ? _sameUrlAttempts + 1
+          : maxAutomaticAttempts;
+      if (state.automaticAttempts >= maxAttempts) continue;
+
+      final cooldown = stagedImage ? _quickFailureDelay : retryCooldown;
       if (state.lastAttempt != null &&
-          now.difference(state.lastAttempt!) < retryCooldown) {
+          now.difference(state.lastAttempt!) < cooldown) {
         continue;
       }
       final elapsed = now.difference(state.lastActivity!);
+      final imageType =
+          stagedImage && state.automaticAttempts == _sameUrlAttempts
+          ? VisiblePageRetryType.imageWithRefreshedUrl
+          : VisiblePageRetryType.image;
       switch (state.phase) {
         case _VisiblePagePhase.metadataFailed:
           if (elapsed >= failureDelay) {
             return VisiblePageRetry(index, VisiblePageRetryType.metadata);
           }
         case _VisiblePagePhase.imageFailed:
-          if (elapsed >= failureDelay) {
-            return VisiblePageRetry(index, VisiblePageRetryType.image);
+          if (elapsed >= (stagedImage ? _quickFailureDelay : failureDelay)) {
+            return VisiblePageRetry(index, imageType);
           }
         case _VisiblePagePhase.imageLoading:
           if (elapsed >= stalledImageDelay) {
-            return VisiblePageRetry(index, VisiblePageRetryType.image);
+            return VisiblePageRetry(index, imageType);
           }
         case _VisiblePagePhase.idle:
         case _VisiblePagePhase.metadataLoading:

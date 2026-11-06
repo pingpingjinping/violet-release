@@ -12,6 +12,8 @@ import 'package:violet/script/script_manager.dart';
 class HitomiImageProvider extends VioletImageProvider {
   ImageList imageList;
   String id;
+  Future<void>? _pendingAutomaticRefresh;
+  DateTime? _lastAutomaticRefresh;
 
   HitomiImageProvider(this.imageList, this.id);
 
@@ -107,7 +109,44 @@ class HitomiImageProvider extends VioletImageProvider {
 
   @override
   Future<void> refresh() async {
-    final next = await HitomiManager.getImageList(id);
+    _replaceImageList(await HitomiManager.getImageList(id));
+  }
+
+  Future<String> refreshImageUrlForAutomaticRetry(
+    int page,
+    String oldUrl,
+  ) async {
+    if (imageList.urls[page] != oldUrl) return imageList.urls[page];
+
+    // Several pages can fail on the same stale routing data. Share a recent
+    // gallery lookup rather than fetching gg.js separately for every page.
+    final pending = _pendingAutomaticRefresh;
+    final last = _lastAutomaticRefresh;
+    if (pending != null) {
+      await pending;
+    } else if (last == null ||
+        DateTime.now().difference(last) >= const Duration(seconds: 5)) {
+      await (_pendingAutomaticRefresh = _refreshForCurrentPageCount()
+          .whenComplete(() {
+            _pendingAutomaticRefresh = null;
+            _lastAutomaticRefresh = DateTime.now();
+          }));
+    }
+    return imageList.urls[page];
+  }
+
+  Future<void> _refreshForCurrentPageCount() async {
+    final next = await HitomiManager.getImageList(
+      id,
+    ).timeout(const Duration(seconds: 8));
+    // The open viewer keeps its original page indices for the whole session.
+    if (next.urls.length != imageList.urls.length) {
+      throw StateError('Hitomi page count changed during recovery for $id');
+    }
+    _replaceImageList(next);
+  }
+
+  void _replaceImageList(ImageList next) {
     if (next.urls.isEmpty || next.bigThumbnails.isEmpty) {
       throw StateError('Hitomi image list refresh returned empty for $id');
     }
