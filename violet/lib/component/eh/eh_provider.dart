@@ -20,6 +20,8 @@ class EHentaiImageProvider extends VioletImageProvider {
   late List<String> imgUrls;
   late Semaphore pageThrottler;
   final Map<int, Future<String>> _pendingImageUrls = {};
+  final Future<String> Function(String url, {required bool bypassCache})
+  _requestImagePage;
   int imagesPerPage;
 
   EHentaiImageProvider({
@@ -28,7 +30,9 @@ class EHentaiImageProvider extends VioletImageProvider {
     required this.pagesUrl,
     required this.isEHentai,
     required this.imagesPerPage,
-  });
+    Future<String> Function(String url, {required bool bypassCache})?
+    requestImagePage,
+  }) : _requestImagePage = requestImagePage ?? EHSession.requestString;
 
   @override
   Future<void> init() async {
@@ -62,18 +66,27 @@ class EHentaiImageProvider extends VioletImageProvider {
   }
 
   @override
-  Future<String> getImageUrl(int page) {
-    if (imgUrls[page].isNotEmpty) return Future<String>.value(imgUrls[page]);
+  Future<String> getImageUrl(int page) => _getImageUrl(page, refresh: false);
+
+  @override
+  Future<String> getImageUrlForRetry(int page) =>
+      _getImageUrl(page, refresh: true);
+
+  Future<String> _getImageUrl(int page, {required bool refresh}) {
     final existing = _pendingImageUrls[page];
     if (existing != null) return existing;
+    if (!refresh && imgUrls[page].isNotEmpty) {
+      return Future<String>.value(imgUrls[page]);
+    }
 
-    // Share ongoing lookups between viewer rebuilds and prefetch requests.
-    final pending = _resolveImageUrl(page);
-    _pendingImageUrls[page] = pending;
-    return pending.whenComplete(() => _pendingImageUrls.remove(page));
+    // Share ongoing lookups while preserving the last URL if a refresh fails.
+    return _pendingImageUrls[page] = _resolveImageUrl(
+      page,
+      refresh: refresh,
+    ).whenComplete(() => _pendingImageUrls.remove(page));
   }
 
-  Future<String> _resolveImageUrl(int page) async {
+  Future<String> _resolveImageUrl(int page, {required bool refresh}) async {
     final release = await pageThrottler.acquire();
     try {
       if (urls[page] == null) {
@@ -96,13 +109,14 @@ class EHentaiImageProvider extends VioletImageProvider {
     if (imagePageUrl == null) {
       throw StateError('Could not find ExHentai image page $page');
     }
-    final html = await EHSession.requestString(imagePageUrl);
-    if (Settings.downloadEhRawImage.value) {
-      return imgUrls[page] = HtmlUnescape().convert(
-        EHParser.getOriginalImageAddress(html),
-      );
+    final html = await _requestImagePage(imagePageUrl, bypassCache: refresh);
+    final imageUrl = Settings.downloadEhRawImage.value
+        ? HtmlUnescape().convert(EHParser.getOriginalImageAddress(html))
+        : EHParser.getImageAddress(html);
+    if (imageUrl.trim().isEmpty) {
+      throw StateError('Image URL is empty for page $page');
     }
-    return imgUrls[page] = EHParser.getImageAddress(html);
+    return imgUrls[page] = imageUrl;
   }
 
   @override

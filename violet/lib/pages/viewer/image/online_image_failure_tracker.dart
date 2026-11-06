@@ -17,11 +17,13 @@ class OnlineImageFailureTracker {
     _failed.remove(index);
   }
 
+  bool isFailed(int index) => _failed.contains(index);
+
   List<int> retryablePages({
     required int pageCount,
     required bool Function(int index) hasUrl,
   }) => [
     for (var index = 0; index < pageCount; index++)
-      if (_failed.contains(index) && hasUrl(index)) index,
+      if (isFailed(index) && hasUrl(index)) index,
   ];
 }

@@ -4,6 +4,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:extended_image/extended_image.dart' show ExtendedImageState;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -83,11 +84,11 @@ class ViewerController extends GetxController {
   var onSession = true.obs;
   var isStaring = true;
   var sliderOnChange = false;
-  bool _refreshingFailedImages = false;
+  final _imageRetries = OnlineImageRetryCoordinator();
   // Actual image download failures, not pages still loading or resolving URLs.
   final failedOnlineImages = OnlineImageFailureTracker();
   final visiblePageRecovery = VisibleOnlinePageRecovery();
-  bool get isRefreshingImages => _refreshingFailedImages;
+  bool get isRefreshingImages => _imageRetries.isBusy;
 
   /// these are used on overlay
   var overlay = false.obs;
@@ -348,12 +349,9 @@ class ViewerController extends GetxController {
     gotoSearchIndex();
   }
 
-  /// Automatic recovery affects ONLY the visible page. Unlike the manual
-  /// purple action, it must not refresh the whole gallery or other pages.
-  /// Returns false when another refresh is running or the URL is unknown.
+  /// Automatic recovery only retries the one visible page.
   Future<bool> retryVisibleImage(int index) async {
-    if (_refreshingFailedImages ||
-        !provider.useProvider ||
+    if (!provider.useProvider ||
         provider.provider == null ||
         index < 0 ||
         index >= maxPage ||
@@ -361,107 +359,88 @@ class ViewerController extends GetxController {
       return false;
     }
 
-    _refreshingFailedImages = true;
-    try {
-      final oldUrl = urlCache[index]!.value;
-      try {
-        final header = await provider.provider!.getHeader(index);
-        final url = await provider.provider!.getImageUrl(index);
-        if (url.trim().isEmpty) throw StateError('Empty URL at page $index');
-        headerCache[index] = header;
-        await CachedNetworkImage.evictFromCache(oldUrl);
-        imgKeys[index] = GlobalKey();
-        if (urlCache[index]!.value == url) {
-          urlCache[index]!.refresh();
-        } else {
-          urlCache[index]!.value = url;
-        }
-      } catch (error, stackTrace) {
-        Logger.warning(
-          '[viewer-visible-recovery] Page $index: $error\\n$stackTrace',
-        );
-        // A transient URL lookup error should not prevent one retry of the
-        // previous URL. Re-key even when the image address has not changed.
-        await CachedNetworkImage.evictFromCache(oldUrl);
-        imgKeys[index] = GlobalKey();
-        urlCache[index]!.refresh();
-      }
-    } finally {
-      _refreshingFailedImages = false;
-    }
-    return true;
+    return _imageRetries.tryAutomatic(() => _retryImage(index));
   }
 
-  /// The purple refresh button retries ALL confirmed image failures.
-  /// Image downloads still in progress must never be restarted by this action.
+  /// The purple refresh button retries all currently confirmed image failures.
   Future<void> refreshFailedImages() async {
-    if (_refreshingFailedImages ||
-        !provider.useProvider ||
-        provider.provider == null) {
-      return;
-    }
+    final source = provider.provider;
+    if (!provider.useProvider || source == null) return;
 
-    final failedPages = failedOnlineImages.retryablePages(
-      pageCount: maxPage,
-      hasUrl: (index) => urlCache[index] != null,
-    );
-    if (failedPages.isEmpty) return;
+    await _imageRetries.runManual(() async {
+      if (!onSession.value) return;
+      final failedPages = failedOnlineImages.retryablePages(
+        pageCount: maxPage,
+        hasUrl: (index) => urlCache[index] != null,
+      );
+      if (failedPages.isEmpty) return;
 
-    _refreshingFailedImages = true;
-    try {
-      if (provider.provider!.isRefreshable()) {
+      if (source.isRefreshable()) {
         try {
-          // Refresh the whole gallery source so a broken/stale URL set is
-          // replaced once, while already loaded pages remain untouched.
-          await provider.provider!.refresh();
-        } catch (e, st) {
+          // Hitomi can refresh its gallery URLs once for the entire batch.
+          await source.refresh();
+        } catch (error, stackTrace) {
           Logger.warning(
-            '[viewer-refresh-failed-images] Provider refresh failed: $e\n$st',
+            '[viewer-refresh-failed-images] Provider refresh failed: '
+            '$error\n$stackTrace',
           );
         }
       }
 
       for (final index in failedPages) {
-        final oldUrl = urlCache[index]?.value;
-
-        try {
-          final header = await provider.provider!.getHeader(index);
-          final url = await provider.provider!.getImageUrl(index);
-
-          headerCache[index] = header;
-          if (oldUrl != null) {
-            await CachedNetworkImage.evictFromCache(oldUrl);
-          }
-
-          // Only failed pages are rebuilt. Successfully loaded pages keep
-          // their current widget and cache even though the provider refreshed.
-          imgKeys[index] = GlobalKey();
-          if (urlCache[index] == null) {
-            urlCache[index] = RxString(url);
-          } else if (urlCache[index]!.value != url) {
-            urlCache[index]!.value = url;
-          } else {
-            // The source may be unchanged after a transient failure. Force
-            // observers to rebuild so the same URL is genuinely retried.
-            urlCache[index]!.refresh();
-          }
-        } catch (e, st) {
-          Logger.warning(
-            '[viewer-refresh-failed-images] Page $index refresh failed: '
-            '$e\n$st',
-          );
-
-          // Even if resolving a fresh URL failed, retry the existing URL after
-          // evicting its failed cache entry.
-          if (oldUrl != null && urlCache[index] != null) {
-            await CachedNetworkImage.evictFromCache(oldUrl);
-            imgKeys[index] = GlobalKey();
-            urlCache[index]!.refresh();
-          }
-        }
+        await _retryImage(index, confirmedFailureOnly: true);
       }
-    } finally {
-      _refreshingFailedImages = false;
+    });
+  }
+
+  Future<void> _retryImage(
+    int index, {
+    bool confirmedFailureOnly = false,
+  }) async {
+    final source = provider.provider!;
+    final cachedUrl = urlCache[index];
+
+    bool canRetry() =>
+        onSession.value &&
+        !isImageLoaded[index] &&
+        (!confirmedFailureOnly || failedOnlineImages.isFailed(index));
+
+    if (cachedUrl == null || !canRetry()) return;
+    final oldUrl = cachedUrl.value;
+    var nextUrl = oldUrl;
+    Map<String, String>? nextHeader;
+    try {
+      nextHeader = await source.getHeader(index);
+      final url = await source.getImageUrlForRetry(index);
+      if (url.trim().isEmpty) throw StateError('Empty URL at page $index');
+      nextUrl = url;
+    } catch (error, stackTrace) {
+      // Keep the previous URL available when fresh metadata cannot be fetched.
+      Logger.warning('[viewer-image-retry] Page $index: $error\n$stackTrace');
+    }
+
+    if (!canRetry()) return;
+    try {
+      await CachedNetworkImage.evictFromCache(oldUrl);
+    } catch (error) {
+      Logger.warning('[viewer-image-retry] Prefetch cache eviction: $error');
+    }
+    if (!canRetry()) return;
+    final imageState = imgKeys[index].currentState;
+    if (imageState is ExtendedImageState) {
+      // A same-URL reload must not rejoin a stalled ExtendedImage stream.
+      await imageState.imageProvider.evict();
+    }
+    if (!canRetry()) return;
+
+    if (nextHeader != null) headerCache[index] = nextHeader;
+    imgKeys[index] = GlobalKey();
+    failedOnlineImages.markLoading(index);
+    visiblePageRecovery.imageLoading(index, DateTime.now());
+    if (cachedUrl.value == nextUrl) {
+      cachedUrl.refresh();
+    } else {
+      cachedUrl.value = nextUrl;
     }
   }
 
