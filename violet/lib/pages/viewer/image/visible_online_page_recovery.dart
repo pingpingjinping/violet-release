@@ -37,7 +37,37 @@ class VisibleOnlinePageRecovery {
   static const Duration retryCooldown = Duration(seconds: 20);
   static const int maxAutomaticAttempts = 2;
   static const Duration _quickFailureDelay = Duration(seconds: 1);
+  // First attempt refreshes a potentially stale gallery URL; the remaining
+  // two attempts reuse the resolved URL without additional gallery lookups.
   static const int _sameUrlAttempts = 2;
+
+  /// Select confirmed failed images around the viewport, prioritizing the
+  /// next seven pages before the previous three. Neither unattempted pages
+  /// nor pages still actively loading are eligible for recovery.
+  static Iterable<int> failedNearbyPages({
+    required int firstVisibleIndex,
+    required int lastVisibleIndex,
+    required int pageCount,
+    required bool Function(int index) isFailed,
+    int previous = 3,
+    int next = 7,
+  }) sync* {
+    if (firstVisibleIndex < 0 ||
+        lastVisibleIndex >= pageCount ||
+        firstVisibleIndex > lastVisibleIndex) {
+      return;
+    }
+    for (var offset = 1; offset <= next; offset++) {
+      final index = lastVisibleIndex + offset;
+      if (index >= pageCount) break;
+      if (isFailed(index)) yield index;
+    }
+    for (var offset = 1; offset <= previous; offset++) {
+      final index = firstVisibleIndex - offset;
+      if (index < 0) break;
+      if (isFailed(index)) yield index;
+    }
+  }
 
   final bool stagedImageRetries;
   final Map<int, _PageRecoveryState> _states = {};
@@ -127,8 +157,7 @@ class VisibleOnlinePageRecovery {
         continue;
       }
       final elapsed = now.difference(state.lastActivity!);
-      final imageType =
-          stagedImage && state.automaticAttempts == _sameUrlAttempts
+      final imageType = stagedImage && state.automaticAttempts == 0
           ? VisiblePageRetryType.imageWithRefreshedUrl
           : VisiblePageRetryType.image;
       switch (state.phase) {

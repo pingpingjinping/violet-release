@@ -102,8 +102,8 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
           }
         });
 
-    // The list also builds prefetched pages. Check actual viewport geometry,
-    // never all missing URLs or every page in the cache extent.
+    // Check real viewport geometry before choosing a page. Hitomi may also
+    // retry already-failed images from three behind to seven ahead.
     if (c.provider.useProvider) {
       _visibleRecoveryTimer = Timer.periodic(
         Duration(seconds: c.visiblePageRecovery.stagedImageRetries ? 1 : 3),
@@ -205,10 +205,9 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
     );
   }
 
-  /// Only pages that intersect the *actual* viewport may be recovered.
-  ///
-  /// Normal prefetch and actively progressing image transfers are excluded;
-  /// the recovery policy limits the number of attempts per page.
+  /// Always prioritize on-screen failures. For Hitomi, recover confirmed
+  /// failures in the next seven and previous three pages without touching
+  /// initial loads. Requests remain serialized with bounded retry budgets.
   Future<void> _recoverVisibleOnlinePage() async {
     if (_checkingVisibleRecovery ||
         !mounted ||
@@ -232,7 +231,23 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         )
         .map((position) => position.index)
         .toSet();
-    final retry = c.visiblePageRecovery.candidate(visible, DateTime.now());
+    final now = DateTime.now();
+    var retry = c.visiblePageRecovery.candidate(visible, now);
+    var isLookaheadRetry = false;
+    if (retry == null &&
+        c.visiblePageRecovery.stagedImageRetries &&
+        visible.isNotEmpty) {
+      final firstVisibleIndex = visible.reduce((a, b) => a < b ? a : b);
+      final lastVisibleIndex = visible.reduce((a, b) => a > b ? a : b);
+      final failedNearby = VisibleOnlinePageRecovery.failedNearbyPages(
+        firstVisibleIndex: firstVisibleIndex,
+        lastVisibleIndex: lastVisibleIndex,
+        pageCount: c.maxPage,
+        isFailed: c.failedOnlineImages.isFailed,
+      );
+      retry = c.visiblePageRecovery.candidate(failedNearby, now);
+      isLookaheadRetry = retry != null;
+    }
     if (retry == null) return;
 
     _checkingVisibleRecovery = true;
@@ -242,8 +257,10 @@ class _VerticalViewerPageState extends State<VerticalViewerPage>
         c.retryPageLoad(retry.index);
         if (mounted) setState(() {});
       } else if (!c.isRefreshingImages && c.urlCache[retry.index] != null) {
-        c.visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
-        await c.retryVisibleImage(retry);
+        await c.retryVisibleImage(
+          retry,
+          precacheContext: isLookaheadRetry ? context : null,
+        );
       }
     } catch (error) {
       // A failed automatic attempt never starts an unbounded retry loop.

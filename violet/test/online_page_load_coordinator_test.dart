@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
+import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 
 void main() {
   OnlinePageLoadCoordinator coordinator() => OnlinePageLoadCoordinator(
@@ -110,6 +111,31 @@ void main() {
       expect(retries.isBusy, isFalse);
     },
   );
+
+  test('busy retry coordinator does not consume a Hitomi attempt', () async {
+    final retries = OnlineImageRetryCoordinator();
+    final recovery = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    final start = DateTime.utc(2026, 11, 6);
+    recovery.imageFailed(7, start);
+    final firstAttemptAt = start.add(const Duration(seconds: 1));
+    final retry = recovery.candidate([7], firstAttemptAt)!;
+    expect(retry.type, VisiblePageRetryType.imageWithRefreshedUrl);
+
+    final releaseManual = Completer<void>();
+    final manual = retries.runManual(() => releaseManual.future);
+    final accepted = await retries.tryAutomatic(() async {
+      recovery.beginAutomaticRetry(retry, firstAttemptAt);
+    });
+    expect(accepted, isFalse);
+    expect(recovery.automaticAttempts(7), 0);
+
+    releaseManual.complete();
+    await manual;
+    expect(
+      recovery.candidate([7], start.add(const Duration(seconds: 2)))?.type,
+      VisiblePageRetryType.imageWithRefreshedUrl,
+    );
+  });
 
   test('automatic recovery failure still lets the manual retry run', () async {
     final retries = OnlineImageRetryCoordinator();

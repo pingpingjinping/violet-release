@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
 import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 
 void main() {
@@ -81,7 +82,64 @@ void main() {
     );
   });
 
-  test('Hitomi quickly retries twice before refreshing the image URL', () {
+  test('Hitomi recovers only confirmed nearby failures', () {
+    final failures = OnlineImageFailureTracker();
+    for (final index in [2, 6, 7, 8, 10, 14, 15, 16]) {
+      failures.markFailed(index);
+    }
+    failures.markLoading(10);
+
+    // Visible pages 7-8, next 7 pages, previous 3 pages.
+    final nearbyFailures = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 7,
+      lastVisibleIndex: 8,
+      pageCount: 20,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(nearbyFailures, [14, 15, 6]);
+
+    final recovery = VisibleOnlinePageRecovery(stagedImageRetries: true);
+    for (final index in nearbyFailures) {
+      recovery.imageFailed(index, start);
+    }
+    final when = start.add(const Duration(seconds: 1));
+    final retry = recovery.candidate(nearbyFailures, when);
+    expect(retry?.index, 14);
+  });
+
+  test('nearby recovery respects gallery boundaries', () {
+    final failures = OnlineImageFailureTracker();
+    failures.markFailed(0);
+    failures.markFailed(1);
+    failures.markFailed(13);
+    failures.markFailed(14);
+
+    final atStart = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 2,
+      lastVisibleIndex: 3,
+      pageCount: 15,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(atStart, [1, 0]);
+
+    final atEnd = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 11,
+      lastVisibleIndex: 12,
+      pageCount: 15,
+      isFailed: failures.isFailed,
+    ).toList();
+    expect(atEnd, [13, 14]);
+
+    final noFailures = VisibleOnlinePageRecovery.failedNearbyPages(
+      firstVisibleIndex: 0,
+      lastVisibleIndex: 0,
+      pageCount: 15,
+      isFailed: (_) => false,
+    ).toList();
+    expect(noFailures, isEmpty);
+  });
+
+  test('Hitomi refreshes the URL first, then retries it twice', () {
     final state = VisibleOnlinePageRecovery(stagedImageRetries: true);
     state.imageFailed(1, start);
     expect(
@@ -90,9 +148,9 @@ void main() {
     );
 
     const stages = [
-      VisiblePageRetryType.image,
-      VisiblePageRetryType.image,
       VisiblePageRetryType.imageWithRefreshedUrl,
+      VisiblePageRetryType.image,
+      VisiblePageRetryType.image,
     ];
     for (var i = 0; i < stages.length; i++) {
       final at = start.add(Duration(seconds: i + 1));
@@ -115,7 +173,7 @@ void main() {
 
     final next = state.candidate([1, 2], start.add(const Duration(seconds: 2)));
     expect(next?.index, first.index == 1 ? 2 : 1);
-    expect(next?.type, VisiblePageRetryType.image);
+    expect(next?.type, VisiblePageRetryType.imageWithRefreshedUrl);
   });
 
   test('Hitomi metadata recovery does not spend image retries', () {
@@ -131,7 +189,7 @@ void main() {
     expect(state.automaticAttempts(1), 0);
     expect(
       state.candidate([1], at.add(const Duration(seconds: 1)))?.type,
-      VisiblePageRetryType.image,
+      VisiblePageRetryType.imageWithRefreshedUrl,
     );
   });
 }

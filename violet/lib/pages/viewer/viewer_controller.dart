@@ -4,7 +4,8 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:extended_image/extended_image.dart' show ExtendedImageState;
+import 'package:extended_image/extended_image.dart'
+    show ExtendedImageState, ExtendedNetworkImageProvider, ExtendedResizeImage;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ import 'package:violet/component/hitomi/hitomi_provider.dart';
 import 'package:violet/component/hitomi/message_search.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/pages/viewer/image/online_image_failure_tracker.dart';
+import 'package:violet/pages/viewer/image/online_image_retry_policy.dart';
 import 'package:violet/pages/viewer/image/online_page_load_coordinator.dart';
 import 'package:violet/pages/viewer/image/visible_online_page_recovery.dart';
 import 'package:violet/pages/viewer/others/preload_page_view.dart';
@@ -352,8 +354,12 @@ class ViewerController extends GetxController {
     gotoSearchIndex();
   }
 
-  /// Automatic recovery only retries the one visible page.
-  Future<bool> retryVisibleImage(VisiblePageRetry retry) async {
+  /// Automatic recovery handles visible failures and confirmed failed Hitomi
+  /// pages just ahead of the reader. Only one request runs at a time.
+  Future<bool> retryVisibleImage(
+    VisiblePageRetry retry, {
+    BuildContext? precacheContext,
+  }) async {
     final index = retry.index;
     if (!provider.useProvider ||
         provider.provider == null ||
@@ -363,9 +369,82 @@ class ViewerController extends GetxController {
       return false;
     }
 
-    return _imageRetries.tryAutomatic(
-      () => _retryImage(index, automatic: retry),
-    );
+    return _imageRetries.tryAutomatic(() async {
+      // Do not consume a limited automatic retry while the manual retry
+      // coordinator is busy or after another request finished this image.
+      if (!onSession.value || isImageLoaded[index]) return;
+      if (precacheContext != null && !failedOnlineImages.isFailed(index)) {
+        return;
+      }
+      visiblePageRecovery.beginAutomaticRetry(retry, DateTime.now());
+      await _retryImage(index, automatic: retry);
+
+      // Off-screen widgets are not mounted, so changing their URL alone does
+      // not send an image request. Actually fetch only confirmed failures.
+      if (precacheContext != null &&
+          imgKeys[index].currentState == null &&
+          !isImageLoaded[index]) {
+        await _precacheRecoveredHitomiImage(precacheContext, index);
+      }
+    });
+  }
+
+  Future<void> _precacheRecoveredHitomiImage(
+    BuildContext context,
+    int index,
+  ) async {
+    if (!context.mounted || !onSession.value) return;
+    final url = urlCache[index]?.value;
+    final header = headerCache[index];
+    if (url == null || header == null) return;
+
+    var failed = false;
+    try {
+      final policy = onlineImageRetryPolicy(provider.provider);
+      final imageProvider = ExtendedResizeImage.resizeIfNeeded(
+        provider: ExtendedNetworkImageProvider(
+          url,
+          headers: header,
+          cache: false,
+          retries: policy.retries,
+          timeRetry: policy.interval,
+        ),
+        cacheHeight: Settings.useLowPerf.value
+            ? (MediaQuery.of(context).size.width * 2.0).toInt()
+            : null,
+      );
+      await precacheImage(
+        imageProvider,
+        context,
+        onError: (error, stackTrace) {
+          failed = true;
+          Logger.warning(
+            '[viewer-hitomi-lookahead] Page $index: $error\n$stackTrace',
+          );
+        },
+      );
+    } catch (error, stackTrace) {
+      failed = true;
+      Logger.warning(
+        '[viewer-hitomi-lookahead] Page $index: $error\n$stackTrace',
+      );
+    }
+
+    // A newly mounted ProviderImage now owns its state, and a newer URL must
+    // never be overwritten by an older background request's completion.
+    if (!onSession.value ||
+        urlCache[index]?.value != url ||
+        imgKeys[index].currentState != null) {
+      return;
+    }
+    if (failed) {
+      failedOnlineImages.markFailed(index);
+      visiblePageRecovery.imageFailed(index, DateTime.now());
+    } else {
+      isImageLoaded[index] = true;
+      failedOnlineImages.markLoaded(index);
+      visiblePageRecovery.imageLoaded(index);
+    }
   }
 
   /// The purple refresh button retries all currently confirmed image failures.
