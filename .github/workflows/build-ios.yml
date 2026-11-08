@@ -52,6 +52,39 @@ jobs:
             aarch64-apple-ios-sim \
             x86_64-apple-ios
 
+      # These caches live in GitHub Actions' cache storage, separately from IPA releases.
+      # Keep DerivedData caching restricted to Cargokit's Rust target, not the
+      # entire Xcode build directory (which is much larger and often misses).
+      - name: Record compiler versions for cache keys
+        id: compiler-versions
+        run: |
+          echo "xcode=$(xcodebuild -version | awk '/^Xcode / {print $2}')" >> "$GITHUB_OUTPUT"
+          echo "rust=$(rustc --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore CocoaPods cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            violet/ios/Pods
+          key: ios-pods-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('violet/ios/Podfile.lock', 'violet/pubspec.lock') }}-v1
+          restore-keys: |
+            ios-pods-${{ runner.os }}-${{ runner.arch }}-
+
+      # Cargokit passes Xcode's TARGET_TEMP_DIR to cargo --target-dir;
+      # violet/rust/target is therefore NOT where iOS Rust builds are saved.
+      - name: Restore iOS Rust dependency and compilation cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            ~/.cargo/git/db
+            violet/build/DerivedData/Build/Intermediates.noindex/Pods.build/Release-iphoneos/rust_lib_violet.build
+          key: ios-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler-versions.outputs.xcode }}-${{ steps.compiler-versions.outputs.rust }}-${{ hashFiles('violet/rust/Cargo.lock') }}-v1
+          restore-keys: |
+            ios-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler-versions.outputs.xcode }}-${{ steps.compiler-versions.outputs.rust }}-
+
       - name: Prepare fallback salt files
         working-directory: violet
         run: |
