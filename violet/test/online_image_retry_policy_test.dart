@@ -51,8 +51,8 @@ void main() {
     final uri = Uri.parse('https://example.test/image.png');
 
     Future<void> loadImage(List<int> statuses, List<Uri> requests) async {
-      debugNetworkImageHttpClientProvider =
-          () => _ImageClient(statuses, requests);
+      debugNetworkImageHttpClientProvider = () =>
+          _ImageClient(statuses, requests);
       final provider = onlineViewerImageProvider(
         hitomi,
         uri.toString(),
@@ -60,13 +60,10 @@ void main() {
       );
       final completer = Completer<void>();
       final stream = provider.resolve(ImageConfiguration.empty);
-      final listener = ImageStreamListener(
-        (image, _) {
-          image.dispose();
-          if (!completer.isCompleted) completer.complete();
-        },
-        onError: completer.completeError,
-      );
+      final listener = ImageStreamListener((image, _) {
+        image.dispose();
+        if (!completer.isCompleted) completer.complete();
+      }, onError: completer.completeError);
       stream.addListener(listener);
       try {
         await completer.future;

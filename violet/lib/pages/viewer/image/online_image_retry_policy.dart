@@ -112,7 +112,9 @@ class _HitomiViewerImageProvider
       if (cache) {
         try {
           final temp = await getTemporaryDirectory();
-          cached = File(path.join(temp.path, cacheImageFolderName, keyToMd5(url)));
+          cached = File(
+            path.join(temp.path, cacheImageFolderName, keyToMd5(url)),
+          );
           if (await cached.exists()) {
             return await instantiateImageCodec(
               await cached.readAsBytes(),
@@ -173,7 +175,10 @@ class _HitomiViewerImageProvider
     if (response == null) throw StateError('Failed to load $url.');
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
-      throw NetworkImageLoadException(statusCode: response.statusCode, uri: uri);
+      throw NetworkImageLoadException(
+        statusCode: response.statusCode,
+        uri: uri,
+      );
     }
     return response;
   }
