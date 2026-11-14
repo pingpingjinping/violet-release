@@ -3,13 +3,13 @@ import 'package:violet/services/download_image_provider.dart';
 // Copyright (C) 2020-2024. violet-team. Licensed under the Apache-2.0 License.
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:violet/pages/segment/platform_navigator.dart';
 import 'package:violet/pages/viewer/image/image_crop_bookmark.dart';
+import 'package:violet/pages/viewer/image/online_image_retry_policy.dart';
 import 'package:violet/pages/viewer/image/online_page_load_error.dart';
 import 'package:violet/pages/viewer/others/photo_view_gallery.dart';
 import 'package:violet/pages/viewer/viewer_controller.dart';
@@ -415,13 +415,7 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
             } else {
               return Obx(
                 () => PhotoView(
-                  imageProvider: ExtendedNetworkImageProvider(
-                    c.urlCache[index]!.value,
-                    headers: c.headerCache[index],
-                    cache: true,
-                    retries: 10,
-                    timeRetry: const Duration(milliseconds: 300),
-                  ),
+                  imageProvider: _onlineImage(index),
                   filterQuality: SettingsWrapper.getImageQuality(
                     c.imgQuality.value,
                   ),
@@ -541,14 +535,16 @@ class _HorizontalViewerPageState extends State<HorizontalViewerPage> {
     );
   }
 
+  ImageProvider<Object> _onlineImage(int index) => onlineViewerImageProvider(
+    c.provider.provider,
+    c.urlCache[index]!.value,
+    headers: c.headerCache[index],
+    retries: 10,
+    interval: const Duration(milliseconds: 300),
+  );
+
   Widget imageWidget(int index) {
-    final provider = ExtendedNetworkImageProvider(
-      c.urlCache[index]!.value,
-      headers: c.headerCache[index],
-      cache: true,
-      retries: 10,
-      timeRetry: const Duration(milliseconds: 300),
-    );
+    final provider = _onlineImage(index);
 
     provider
         .resolve(ImageConfiguration.empty)
