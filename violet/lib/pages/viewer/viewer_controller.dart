@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:extended_image/extended_image.dart'
-    show ExtendedImageState, ExtendedNetworkImageProvider, ExtendedResizeImage;
+    show ExtendedImageState, ExtendedResizeImage;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -403,14 +403,12 @@ class ViewerController extends GetxController {
 
     var failed = false;
     try {
-      final policy = onlineImageRetryPolicy(provider.provider);
       final imageProvider = ExtendedResizeImage.resizeIfNeeded(
-        provider: ExtendedNetworkImageProvider(
+        provider: onlineViewerImageProvider(
+          provider.provider,
           url,
           headers: header,
           cache: false,
-          retries: policy.retries,
-          timeRetry: policy.interval,
         ),
         cacheHeight: Settings.useLowPerf.value
             ? (MediaQuery.of(context).size.width * 2.0).toInt()

@@ -69,13 +69,19 @@ class _ProviderImageState extends State<ProviderImage> {
 
   @override
   Widget build(BuildContext context) {
-    final retryPolicy = onlineImageRetryPolicy(c.provider.provider);
-    final image = ExtendedImage.network(
-      widget.imgUrl,
+    final image = ExtendedImage(
       key: widget.imgKey,
-      headers: widget.imgHeader,
-      retries: retryPolicy.retries,
-      timeRetry: retryPolicy.interval,
+      image: ExtendedResizeImage.resizeIfNeeded(
+        provider: onlineViewerImageProvider(
+          c.provider.provider,
+          widget.imgUrl,
+          headers: widget.imgHeader,
+        ),
+        cacheHeight: Settings.useLowPerf.value
+            ? (MediaQuery.of(context).size.width * 2.0).toInt()
+            : null,
+      ),
+      enableLoadState: true,
       fit: BoxFit.cover,
       filterQuality: SettingsWrapper.imageQuality,
       // Let Flutter's bounded LRU image cache retain recently viewed pages.
@@ -84,9 +90,6 @@ class _ProviderImageState extends State<ProviderImage> {
       clearMemoryCacheIfFailed: true,
       handleLoadingProgress: true,
       loadStateChanged: _loadStateChanged,
-      cacheHeight: Settings.useLowPerf.value
-          ? (MediaQuery.of(context).size.width * 2.0).toInt()
-          : null,
     );
 
     return GestureDetector(
@@ -184,7 +187,7 @@ class _ProviderImageState extends State<ProviderImage> {
             width: 30,
             height: 30,
             child: CircularProgressIndicator(
-              value: state.loadingProgress == null
+              value: state.loadingProgress?.expectedTotalBytes == null
                   ? null
                   : state.loadingProgress!.cumulativeBytesLoaded /
                         state.loadingProgress!.expectedTotalBytes!,
