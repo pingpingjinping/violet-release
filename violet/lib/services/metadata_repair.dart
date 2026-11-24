@@ -41,10 +41,10 @@ class MetadataRepair {
   }
 
   static Future<Map<String, Object?>?> _row(DatabaseExecutor db, Map<String, dynamic> p) async {
-    final rows = await db.query('HitomiColumnModel',
-        columns: ['Artists', 'Groups', 'EHash', 'ExistOnHitomi'],
-        where: "Id=? AND Files=? AND LOWER(TRIM(Language))='korean'",
-        whereArgs: [p['id'], p['pages']], limit: 1);
+    final rows = await db.rawQuery(
+        'SELECT Artists, "Groups", EHash, ExistOnHitomi FROM HitomiColumnModel '
+        "WHERE Id=? AND Files=? AND LOWER(TRIM(Language))='korean' LIMIT 1",
+        [p['id'], p['pages']]);
     if (rows.isEmpty) return null;
     final row = rows.first;
     if (p['source'] == 'hitomi' && row['ExistOnHitomi'] != 1) return null;
@@ -61,6 +61,14 @@ class MetadataRepair {
       }
     }
     return result;
+  }
+
+  static Future<void> _write(DatabaseExecutor db, int id, Map<String, Object?> changes) async {
+    final fields = ['Artists', 'Groups'].where(changes.containsKey).toList();
+    if (fields.isEmpty) return;
+    final set = fields.map((field) => '"' + field + '"=?').join(',');
+    await db.rawUpdate('UPDATE HitomiColumnModel SET ' + set + ' WHERE Id=?',
+        [...fields.map((field) => changes[field]), id]);
   }
 
   static Future<void> capture(QueryResult qr, {
@@ -109,7 +117,7 @@ class MetadataRepair {
             conflictAlgorithm: ConflictAlgorithm.replace);
         });
         // Persist the queue before touching replaceable content DB.
-        await txn.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [id]);
+        await _write(txn, id, changes);
         qr.result = {...qr.result, ...changes};
         });
       });
@@ -140,10 +148,18 @@ class MetadataRepair {
           await manager.checkOpen();
           await replaySnapshot(manager.db!, server, fresh: false);
         }
-        final rows = await queue.query(_table,
+        final pending = await queue.query(_table,
             where: 'Server=? AND Acknowledged=0', whereArgs: [server], limit: 100);
+        if (pending.isEmpty) return;
+        final rows = <Map<String, Object?>>[];
+        final items = <dynamic>[];
+        for (final row in pending) {
+          final item = jsonDecode(row['Payload'] as String);
+          if (utf8.encode(jsonEncode({'schema': 1, 'items': [...items, item]})).length > 240 * 1024) break;
+          rows.add(row);
+          items.add(item);
+        }
         if (rows.isEmpty) return;
-        final items = rows.map((r) => jsonDecode(r['Payload'] as String)).toList();
         final client = http.Client();
         try {
           final request = http.Request('POST', Uri.parse(ServerConfig.endpoint(base, 'api/metadata-repair')))
@@ -180,8 +196,8 @@ class MetadataRepair {
   /// Called under [lock] after the new snapshot is installed. Acknowledged
   /// repairs remain queued until the unmodified snapshot actually contains
   /// their fields. This protects against an older hourly Pi export.
-  static Future<void> replaySnapshot(Database db, String server, {bool fresh = true}) async {
-    final queue = await _queue();
+  static Future<void> replaySnapshot(Database db, String server, {bool fresh = true, Database? queueDb}) async {
+    final queue = queueDb ?? await _queue();
     final rows = await queue.query(_table, where: 'Server=?', whereArgs: [server]);
     if (rows.isEmpty) return;
     final confirmed = <Object?>[];
@@ -209,7 +225,7 @@ class MetadataRepair {
         if (row == null) continue;
         final changes = _changes(row, p);
         if (changes.isNotEmpty) {
-          await txn.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [p['id']]);
+          await _write(txn, p['id'] as int, changes);
         }
       }
     });
