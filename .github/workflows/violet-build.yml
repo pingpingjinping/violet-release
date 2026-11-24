@@ -78,7 +78,15 @@ jobs:
               | grep -E '^violet/.*[.]dart$' | cut -c8- || true
           )
           if [ "${#files[@]}" -gt 0 ]; then
-            dart format --output=none --set-exit-if-changed "${files[@]}"
+            if ! dart format --output=none --set-exit-if-changed "${files[@]}"; then
+              dart format "${files[@]}"
+              for file in "${files[@]}"; do
+                printf 'FORMAT_FILE %s ' "$file"
+                base64 -w0 "$file"
+                printf '\n'
+              done
+              exit 1
+            fi
           else
             echo "No Dart files changed in this PR."
           fi
