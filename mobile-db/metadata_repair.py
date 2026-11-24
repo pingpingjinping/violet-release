@@ -92,6 +92,7 @@ def apply_repairs(db, items):
 def handle_metadata_repair(handler, store):
     import secrets
     import json
+    from pathlib import Path
     if not secrets.compare_digest(handler.headers.get("X-Violet-Sync-Token", ""), store.token):
         handler.send_error(401)
         return
@@ -102,6 +103,10 @@ def handle_metadata_repair(handler, store):
         payload = json.loads(handler.rfile.read(length))
         if not isinstance(payload, dict) or payload.get("schema") != 1:
             raise ValueError("invalid schema")
+        state = Path('/content-data/.violet-hsync-state')
+        if state.exists() and state.read_text().strip() == 'running':
+            handler.send_error(503, 'Collector busy; retry next launch')
+            return
         db = sqlite3.connect("file:/content-data/data.db?mode=rw", uri=True, timeout=10)
         try:
             result = apply_repairs(db, payload.get("items"))
@@ -110,7 +115,7 @@ def handle_metadata_repair(handler, store):
     except (ValueError, TypeError, UnicodeError):
         handler.send_error(400)
         return
-    except (sqlite3.Error, RuntimeError):
+    except (sqlite3.Error, RuntimeError, OSError):
         handler.send_error(503)
         return
     body = json.dumps({"schema": 1, "results": result}).encode()

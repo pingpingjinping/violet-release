@@ -72,13 +72,13 @@ class MetadataRepair {
     try {
       if (!korean || id != qr.id() || pages <= 0 || pages >= 100000) return;
       if (source == 'eh' && (token == null || !RegExp(r'^[0-9a-fA-F]{10}$').hasMatch(token))) return;
-      if (!missing(qr.artists()) && !missing(qr.groups())) return;
       final a = cleanTags(artists);
       final g = cleanTags(groups);
       if (a.isEmpty && g.isEmpty) return;
       await lock.synchronized(() async {
         final server = ServerConfig.webBase;
-        if (server.isEmpty) return;
+        if (server.isEmpty ||
+            (Settings.prefs.getString('content-snapshot-server') ?? server) != server) return;
         final p = <String, dynamic>{
           'id': id, 'pages': pages, 'source': source, 'token': token,
           'artists': a, 'groups': g,
@@ -86,7 +86,8 @@ class MetadataRepair {
         final manager = await DataBaseManager.getInstance();
         await manager.checkOpen();
         final db = manager.db!;
-        final row = await _row(db, p);
+        await db.transaction((txn) async {
+        final row = await _row(txn, p);
         if (row == null) return;
         final changes = _changes(row, p);
         if (changes.isEmpty) return;
@@ -108,8 +109,9 @@ class MetadataRepair {
             conflictAlgorithm: ConflictAlgorithm.replace);
         });
         // Persist the queue before touching replaceable content DB.
-        await db.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [id]);
+        await txn.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [id]);
         qr.result = {...qr.result, ...changes};
+        });
       });
     } catch (_) {
       // Retry opportunistically on a later open.
@@ -130,6 +132,14 @@ class MetadataRepair {
         final base = ServerConfig.databaseBase(server);
         if (ServerConfig.normalize(sync) != base) return;
         final queue = await _queue();
+        // Recover a queued write if the app stopped between persisting the
+        // queue and updating its replaceable content database.
+        final installedServer = prefs.getString('content-snapshot-server') ?? server;
+        if (installedServer == server && prefs.getInt('db_exists') == 1) {
+          final manager = await DataBaseManager.getInstance();
+          await manager.checkOpen();
+          await replaySnapshot(manager.db!, server, fresh: false);
+        }
         final rows = await queue.query(_table,
             where: 'Server=? AND Acknowledged=0', whereArgs: [server], limit: 100);
         if (rows.isEmpty) return;
@@ -170,19 +180,46 @@ class MetadataRepair {
   /// Called under [lock] after the new snapshot is installed. Acknowledged
   /// repairs remain queued until the unmodified snapshot actually contains
   /// their fields. This protects against an older hourly Pi export.
-  static Future<void> replaySnapshot(Database db, String server) async {
+  static Future<void> replaySnapshot(Database db, String server, {bool fresh = true}) async {
     final queue = await _queue();
     final rows = await queue.query(_table, where: 'Server=?', whereArgs: [server]);
-    for (final record in rows) {
-      final p = Map<String, dynamic>.from(jsonDecode(record['Payload'] as String) as Map);
-      final row = await _row(db, p);
-      if (row == null) continue;
-      final changes = _changes(row, p);
-      if (changes.isNotEmpty) {
-        await db.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [p['id']]);
-      } else if (record['Acknowledged'] == 1) {
-        await queue.delete(_table, where: 'Key=?', whereArgs: [record['Key']]);
+    if (rows.isEmpty) return;
+    final confirmed = <Object?>[];
+    final retry = <Object?>[];
+    await db.transaction((txn) async {
+      // Compare with the unmodified snapshot before applying any overlay.
+      for (final record in rows) {
+        final p = Map<String, dynamic>.from(jsonDecode(record['Payload'] as String) as Map);
+        final row = await _row(txn, p);
+        if (row == null) continue;
+        final changes = _changes(row, p);
+        if (fresh && record['Acknowledged'] == 1) {
+          if (changes.isEmpty) {
+            confirmed.add(record['Key']);
+          } else {
+            // The export may predate the server commit, or a concurrent
+            // collector may have replaced the row. Re-send next cold start.
+            retry.add(record['Key']);
+          }
+        }
       }
-    }
+      for (final record in rows) {
+        final p = Map<String, dynamic>.from(jsonDecode(record['Payload'] as String) as Map);
+        final row = await _row(txn, p);
+        if (row == null) continue;
+        final changes = _changes(row, p);
+        if (changes.isNotEmpty) {
+          await txn.update('HitomiColumnModel', changes, where: 'Id=?', whereArgs: [p['id']]);
+        }
+      }
+    });
+    await queue.transaction((txn) async {
+      for (final key in confirmed) {
+        await txn.delete(_table, where: 'Key=?', whereArgs: [key]);
+      }
+      for (final key in retry) {
+        await txn.update(_table, {'Acknowledged': 0}, where: 'Key=?', whereArgs: [key]);
+      }
+    });
   }
 }

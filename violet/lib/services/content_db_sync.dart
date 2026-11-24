@@ -289,6 +289,7 @@ class ContentDbSync {
         return false;
       }
       final prefs = await SharedPreferences.getInstance();
+      final snapshotServer = ServerConfig.webBase;
       final databaseType =
           prefs.getString('databasetype') ?? Settings.databaseType.value;
       if (prefs.getInt('db_exists') != 1 || databaseType == 'dummy') {
@@ -371,6 +372,9 @@ class ContentDbSync {
       onProgress?.call('DB 적용 중', 0, 0);
       if (!canApply()) return false;
       await MetadataRepair.lock.synchronized(() async {
+      if (ServerConfig.webBase != snapshotServer) {
+        throw StateError('Content server changed during download');
+      }
       await DataBaseManager.instanceLock.synchronized(() async {
         await DataBaseManager.openLock.synchronized(() async {
           await DataBaseManager.reloadInstance();
@@ -387,9 +391,9 @@ class ContentDbSync {
       });
       onProgress?.call('검색 데이터 준비 중', 0, 0);
       await manager.checkOpen();
-      await MetadataRepair.replaySnapshot(manager.db!, ServerConfig.webBase);
+      await MetadataRepair.replaySnapshot(manager.db!, snapshotServer);
       });
-      await prefs.setString('content-snapshot-server', ServerConfig.webBase);
+      await prefs.setString('content-snapshot-server', snapshotServer);
       await prefs.setInt('content-snapshot-version', version);
       await prefs.setInt('synclatest', version);
       await prefs.setString(
