@@ -9,6 +9,8 @@ trap 'rm -rf "$task_download_dir"' EXIT
 task_backup_dir="$PWD/host-sync-backup-$(date +%Y%m%d-%H%M%S)"
 
 task_paths='mobile-db/server.py
+mobile-db/metadata_repair.py
+mobile-db/compose.yml
 mobile-db/host-sync.override.yml
 violet-web/packages/backend/src/services/sync-manager.ts
 violet-web/packages/frontend/src/api/sync.ts

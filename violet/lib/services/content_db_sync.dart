@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/server_config.dart';
+import 'package:violet/services/metadata_repair.dart';
 import 'package:violet/settings/settings.dart';
 
 import 'package:dio/dio.dart';
@@ -78,6 +79,7 @@ class ContentDbSync {
       ),
     );
 
+    await MetadataRepair.flush();
     if (!(prefs.getBool('auto_content_db_update') ?? true)) return false;
     return _inFlight ??= _exchange(canApply, onProgress).whenComplete(() {
       _inFlight = null;
@@ -368,6 +370,7 @@ class ContentDbSync {
       }
       onProgress?.call('DB 적용 중', 0, 0);
       if (!canApply()) return false;
+      await MetadataRepair.lock.synchronized(() async {
       await DataBaseManager.instanceLock.synchronized(() async {
         await DataBaseManager.openLock.synchronized(() async {
           await DataBaseManager.reloadInstance();
@@ -384,6 +387,8 @@ class ContentDbSync {
       });
       onProgress?.call('검색 데이터 준비 중', 0, 0);
       await manager.checkOpen();
+      await MetadataRepair.replaySnapshot(manager.db!, ServerConfig.webBase);
+      });
       await prefs.setString('content-snapshot-server', ServerConfig.webBase);
       await prefs.setInt('content-snapshot-version', version);
       await prefs.setInt('synclatest', version);

@@ -331,6 +331,10 @@ class HitomiImageResolver {
         urls: imageUrls,
         bigThumbnails: bigThumbnailUrls,
         smallThumbnails: smallThumbnailUrls,
+        galleryMetadata: {
+          'id': data['id'], 'language': data['language'],
+          'pages': files.length, 'artists': data['artists'], 'groups': data['groups'],
+        },
       );
     } catch (e) {
       print('[Hitomi Resolver] 에러: $e');

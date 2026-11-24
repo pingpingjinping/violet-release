@@ -19,6 +19,7 @@ import 'package:violet/log/log.dart';
 import 'package:violet/network/wrapper.dart' as http;
 import 'package:violet/script/script_manager.dart';
 import 'package:violet/settings/settings.dart';
+import 'package:violet/services/metadata_repair.dart';
 
 class SearchResult {
   final List<QueryResult> results;
@@ -375,6 +376,7 @@ class HentaiManager {
                 'https://e-hentai.org/g/${qr.id()}/$ehash/?p=0&inline_set=ts_m',
               );
               final article = EHParser.parseArticleData(html);
+              await _captureEhMetadata(qr, html, article, ehash);
               return EHentaiImageProvider(
                 count: article.length,
                 thumbnail: article.thumbnail,
@@ -395,6 +397,7 @@ class HentaiManager {
                 'https://exhentai.org/g/${qr.id()}/$ehash/?p=0&inline_set=ts_m',
               );
               final article = EHParser.parseArticleData(html);
+              await _captureEhMetadata(qr, html, article, ehash);
               return EHentaiImageProvider(
                 count: article.length,
                 thumbnail: article.thumbnail,
@@ -417,6 +420,16 @@ class HentaiManager {
                   imgList.bigThumbnails.isEmpty) {
                 break;
               }
+              final meta = imgList.galleryMetadata;
+              if (meta != null) {
+                await MetadataRepair.capture(qr,
+                  source: 'hitomi', id: int.tryParse(meta['id'].toString()) ?? -1,
+                  pages: meta['pages'] as int,
+                  artists: MetadataRepair.hitomiTags(meta['artists'], 'artist'),
+                  groups: MetadataRepair.hitomiTags(meta['groups'], 'group'),
+                  korean: meta['language'] == 'korean',
+                );
+              }
               return HitomiImageProvider(imgList, qr.id().toString());
             }
         }
@@ -429,6 +442,22 @@ class HentaiManager {
     }
 
     throw Exception('gallery not found');
+  }
+
+  static Future<void> _captureEhMetadata(
+    QueryResult qr, String html, EHArticle article, String requestedToken,
+  ) async {
+    // The requested URL alone is not identity proof: reject redirects or
+    // replacement galleries unless their actual embedded gid/token match.
+    final gid = RegExp(r'\bvar\s+gid\s*=\s*(\d+)\s*;').firstMatch(html)?.group(1);
+    final token = RegExp(r'''\bvar\s+token\s*=\s*["']([0-9a-fA-F]{10})["']\s*;''').firstMatch(html)?.group(1);
+    if (token == null || token != requestedToken) return;
+    await MetadataRepair.capture(qr,
+      source: 'eh', id: int.tryParse(gid ?? '') ?? -1,
+      pages: article.length, token: token,
+      artists: article.artist ?? [], groups: article.group ?? [],
+      korean: article.languages?.contains('korean') ?? false,
+    );
   }
 
   static Future<List<QueryResult>> searchEHentai(
