@@ -11,6 +11,7 @@ from pathlib import Path
 from bookmark_sync import BookmarkStore, handle_request
 from activity_sync import ActivityStore
 from backup_store import BackupStore
+from metadata_repair import handle_metadata_repair
 
 ROOT = Path(os.environ.get('VIOLET_EXPORT_ROOT', '/export'))
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -87,7 +88,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/api/server-info':
             body = json.dumps({'schema': 1, 'features': {
-                'db': True, 'backups': True,
+                'db': True, 'backups': True, 'metadataRepair': True,
                 'graph': bool(os.environ.get('VIOLET_GRAPH_BASE_URL')),
                 'llm': bool(os.environ.get('VIOLET_LLM_BASE_URL')),
             }}).encode()
@@ -126,6 +127,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/api/backups':
             backup_store.handle(self)
+            return
+        if self.path == '/api/metadata-repair':
+            self.connection.settimeout(20)
+            handle_metadata_repair(self, store)
             return
         if self.path not in ('/api/bookmark-sync', '/api/activity-sync'):
             self.send_error(404)

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:violet/services/server_config.dart';
+import 'package:violet/services/metadata_repair.dart';
 import 'package:violet/settings/settings.dart';
 
 import 'package:dio/dio.dart';
@@ -14,7 +15,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:violet/database/database.dart';
 import 'package:violet/log/log.dart';
 import 'package:violet/version/sync.dart';
-
 
 class ExHentaiAuthStatus {
   final bool available;
@@ -41,8 +41,12 @@ class ExHentaiAuthStatus {
       available: json['available'] == true,
       status: json['status'] is String ? json['status'] as String : 'unknown',
       reason: json['reason'] is String ? json['reason'] as String : null,
-      checkedAt: rawCheckedAt is String ? DateTime.tryParse(rawCheckedAt) : null,
-      configured: json['configured'] is bool ? json['configured'] as bool : null,
+      checkedAt: rawCheckedAt is String
+          ? DateTime.tryParse(rawCheckedAt)
+          : null,
+      configured: json['configured'] is bool
+          ? json['configured'] as bool
+          : null,
       source: json['source'] is String ? json['source'] as String : null,
     );
   }
@@ -68,8 +72,7 @@ class ContentDbSync {
     // Bootstrap Pi's ExHentai cookie only when the server has none.
     // A cookie explicitly refreshed by the user is retried until it reaches Pi.
     // Ordinary app launches never overwrite an existing Pi cookie.
-    final pendingEhCookieSync =
-        prefs.getBool(_ehCookieSyncPendingKey) ?? false;
+    final pendingEhCookieSync = prefs.getBool(_ehCookieSyncPendingKey) ?? false;
     unawaited(
       _syncEhCookieToPi(
         prefs,
@@ -78,6 +81,7 @@ class ContentDbSync {
       ),
     );
 
+    await MetadataRepair.flush();
     if (!(prefs.getBool('auto_content_db_update') ?? true)) return false;
     return _inFlight ??= _exchange(canApply, onProgress).whenComplete(() {
       _inFlight = null;
@@ -89,11 +93,7 @@ class ContentDbSync {
     if (force) {
       await prefs.setBool(_ehCookieSyncPendingKey, true);
     }
-    return _syncEhCookieToPi(
-      prefs,
-      force: force,
-      markPendingOnFailure: force,
-    );
+    return _syncEhCookieToPi(prefs, force: force, markPendingOnFailure: force);
   }
 
   static Future<ExHentaiAuthStatus?> fetchExHentaiAuthStatus() async {
@@ -138,10 +138,7 @@ class ContentDbSync {
     final client = http.Client();
     try {
       final cookieUri = Uri.parse(
-        ServerConfig.endpoint(
-          context.apiBase,
-          'api/settings/exhentai-cookie',
-        ),
+        ServerConfig.endpoint(context.apiBase, 'api/settings/exhentai-cookie'),
       );
 
       if (!force) {
@@ -287,6 +284,7 @@ class ContentDbSync {
         return false;
       }
       final prefs = await SharedPreferences.getInstance();
+      final snapshotServer = ServerConfig.webBase;
       final databaseType =
           prefs.getString('databasetype') ?? Settings.databaseType.value;
       if (prefs.getInt('db_exists') != 1 || databaseType == 'dummy') {
@@ -368,23 +366,29 @@ class ContentDbSync {
       }
       onProgress?.call('DB 적용 중', 0, 0);
       if (!canApply()) return false;
-      await DataBaseManager.instanceLock.synchronized(() async {
-        await DataBaseManager.openLock.synchronized(() async {
-          await DataBaseManager.reloadInstance();
-          final wal = File('${destination.path}-wal');
-          if (await wal.exists() && await wal.length() > 0) {
-            throw StateError('Content database is still in use');
-          }
-          for (final suffix in ['-wal', '-shm']) {
-            final sidecar = File('${destination.path}$suffix');
-            if (await sidecar.exists()) await sidecar.delete();
-          }
-          await temporary!.rename(destination.path);
+      await MetadataRepair.lock.synchronized(() async {
+        if (ServerConfig.webBase != snapshotServer) {
+          throw StateError('Content server changed during download');
+        }
+        await DataBaseManager.instanceLock.synchronized(() async {
+          await DataBaseManager.openLock.synchronized(() async {
+            await DataBaseManager.reloadInstance();
+            final wal = File('${destination.path}-wal');
+            if (await wal.exists() && await wal.length() > 0) {
+              throw StateError('Content database is still in use');
+            }
+            for (final suffix in ['-wal', '-shm']) {
+              final sidecar = File('${destination.path}$suffix');
+              if (await sidecar.exists()) await sidecar.delete();
+            }
+            await temporary!.rename(destination.path);
+          });
         });
+        onProgress?.call('검색 데이터 준비 중', 0, 0);
+        await manager.checkOpen();
+        await MetadataRepair.replaySnapshot(manager.db!, snapshotServer);
       });
-      onProgress?.call('검색 데이터 준비 중', 0, 0);
-      await manager.checkOpen();
-      await prefs.setString('content-snapshot-server', ServerConfig.webBase);
+      await prefs.setString('content-snapshot-server', snapshotServer);
       await prefs.setInt('content-snapshot-version', version);
       await prefs.setInt('synclatest', version);
       await prefs.setString(
@@ -417,8 +421,5 @@ class _PiCookieSyncContext {
   final String apiBase;
   final String syncToken;
 
-  const _PiCookieSyncContext({
-    required this.apiBase,
-    required this.syncToken,
-  });
+  const _PiCookieSyncContext({required this.apiBase, required this.syncToken});
 }

@@ -7,11 +7,13 @@ class ImageList {
   final List<String> urls;
   final List<String> bigThumbnails;
   final List<String>? smallThumbnails;
+  final Map<String, dynamic>? galleryMetadata;
 
   const ImageList({
     required this.urls,
     required this.bigThumbnails,
     this.smallThumbnails,
+    this.galleryMetadata,
   });
 }
 
