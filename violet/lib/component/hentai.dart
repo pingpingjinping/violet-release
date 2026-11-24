@@ -416,14 +416,15 @@ class HentaiManager {
               final imgList = await HitomiManager.getImageList(
                 qr.id().toString(),
               );
-              if (imgList.urls.isEmpty ||
-                  imgList.bigThumbnails.isEmpty) {
+              if (imgList.urls.isEmpty || imgList.bigThumbnails.isEmpty) {
                 break;
               }
               final meta = imgList.galleryMetadata;
               if (meta != null) {
-                await MetadataRepair.capture(qr,
-                  source: 'hitomi', id: int.tryParse(meta['id'].toString()) ?? -1,
+                await MetadataRepair.capture(
+                  qr,
+                  source: 'hitomi',
+                  id: int.tryParse(meta['id'].toString()) ?? -1,
                   pages: meta['pages'] as int,
                   artists: MetadataRepair.hitomiTags(meta['artists'], 'artist'),
                   groups: MetadataRepair.hitomiTags(meta['groups'], 'group'),
@@ -445,17 +446,28 @@ class HentaiManager {
   }
 
   static Future<void> _captureEhMetadata(
-    QueryResult qr, String html, EHArticle article, String requestedToken,
+    QueryResult qr,
+    String html,
+    EHArticle article,
+    String requestedToken,
   ) async {
     // The requested URL alone is not identity proof: reject redirects or
     // replacement galleries unless their actual embedded gid/token match.
-    final gid = RegExp(r'\bvar\s+gid\s*=\s*(\d+)\s*;').firstMatch(html)?.group(1);
-    final token = RegExp(r'''\bvar\s+token\s*=\s*["']([0-9a-fA-F]{10})["']\s*;''').firstMatch(html)?.group(1);
+    final gid = RegExp(
+      r'\bvar\s+gid\s*=\s*(\d+)\s*;',
+    ).firstMatch(html)?.group(1);
+    final token = RegExp(
+      r'''\bvar\s+token\s*=\s*["']([0-9a-fA-F]{10})["']\s*;''',
+    ).firstMatch(html)?.group(1);
     if (token == null || token != requestedToken) return;
-    await MetadataRepair.capture(qr,
-      source: 'eh', id: int.tryParse(gid ?? '') ?? -1,
-      pages: article.length, token: token,
-      artists: article.artist ?? [], groups: article.group ?? [],
+    await MetadataRepair.capture(
+      qr,
+      source: 'eh',
+      id: int.tryParse(gid ?? '') ?? -1,
+      pages: article.length,
+      token: token,
+      artists: article.artist ?? [],
+      groups: article.group ?? [],
       korean: article.languages?.contains('korean') ?? false,
     );
   }

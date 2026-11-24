@@ -290,9 +290,7 @@ class HitomiImageResolver {
       final imageDomain = useAvif ? 'a' : 'w';
       final imageExt = useAvif ? 'avif' : 'webp';
       final bigThumbnailPath = useAvif ? 'avifbigtn' : 'webpbigtn';
-      final smallThumbnailPath = useAvif
-          ? 'avifsmallsmalltn'
-          : 'webpsmalltn';
+      final smallThumbnailPath = useAvif ? 'avifsmallsmalltn' : 'webpsmalltn';
 
       for (final file in files) {
         final hash = file['hash'] as String;
@@ -332,17 +330,16 @@ class HitomiImageResolver {
         bigThumbnails: bigThumbnailUrls,
         smallThumbnails: smallThumbnailUrls,
         galleryMetadata: {
-          'id': data['id'], 'language': data['language'],
-          'pages': files.length, 'artists': data['artists'], 'groups': data['groups'],
+          'id': data['id'],
+          'language': data['language'],
+          'pages': files.length,
+          'artists': data['artists'],
+          'groups': data['groups'],
         },
       );
     } catch (e) {
       print('[Hitomi Resolver] 에러: $e');
-      return const ImageList(
-        urls: [],
-        bigThumbnails: [],
-        smallThumbnails: [],
-      );
+      return const ImageList(urls: [], bigThumbnails: [], smallThumbnails: []);
     }
   }
 
